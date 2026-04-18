@@ -5,16 +5,20 @@ import { toKebabCase } from "@/utils/string/case";
 import { config } from "@/config";
 
 export async function registerModules(app: FastifyInstance) {
-  const modulesPath = path.join(process.cwd(), "src/modules");
-  const moduleDirs = fs.readdirSync(modulesPath);
+  const modulesPath = path.resolve(__dirname, "..", "modules");
+  const moduleDirs = fs
+    .readdirSync(modulesPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
+    .map((entry) => entry.name);
   const basePrefix = `${config.app.api.prefix}/${config.app.api.version}`;
+  const moduleFileName = path.extname(__filename) === ".js" ? "index.js" : "index.ts";
 
   for (const dir of moduleDirs) {
-    const modulePath = path.join(modulesPath, dir, "index.ts");
+    const modulePath = path.join(modulesPath, dir, moduleFileName);
 
     if (!fs.existsSync(modulePath)) continue;
 
-    const moduleImport = await import(modulePath);
+    const moduleImport = require(modulePath);
     const moduleFunction = moduleImport[`${dir}Module`];
 
     if (typeof moduleFunction === "function") {
@@ -22,13 +26,10 @@ export async function registerModules(app: FastifyInstance) {
       const isSystemModule = systemModules.includes(dir);
 
       const prefix = isSystemModule
-        ? "" // 👈 no prefix
-        : `${basePrefix}/${dir}`;
+        ? ""
+        : `${basePrefix}/${toKebabCase(dir)}`;
 
       await app.register(moduleFunction, { prefix });
-      // await app.register(moduleFunction, {
-      //   prefix: `${basePrefix}/toKebabCase(${dir})`,
-      // });
 
       app.log.info(`✅ Module loaded: ${dir}`);
     }

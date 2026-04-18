@@ -20,14 +20,30 @@ export class UserRepository {
     });
   }
 
+  async findAuthUserByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async create(data: { name: string; email: string; password: string, roleId:number }) {
     return this.prisma.user.create({ data });
   }
 
-  async fetchUserRoles(name: string) {
-    const userRole = await this.prisma.role.findUnique({
-      where: { name: "user" },
+  async findRoleByName(name: string) {
+    return this.prisma.role.findUnique({
+      where: { name },
     });
-    return userRole;
   }
 }

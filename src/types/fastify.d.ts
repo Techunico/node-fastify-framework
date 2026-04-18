@@ -25,6 +25,5 @@ declare module "fastify" {
     ctx: RequestContext;
     services: Services;
     startTime: [number, number];
-    routerPath:string;
   }
 }

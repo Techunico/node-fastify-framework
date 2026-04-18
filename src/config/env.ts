@@ -1,12 +1,19 @@
 import { envSchema, EnvConfig } from './env.schema'
 
 function loadEnv(): EnvConfig {
-  const parsed = envSchema.safeParse(process.env)
+  const rawEnv = { ...process.env }
+
+  if ((rawEnv.NODE_ENV ?? 'development') === 'test') {
+    rawEnv.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/nodejs_framework_test'
+    rawEnv.JWT_SECRET ??= 'test-secret-12345'
+  }
+
+  const parsed = envSchema.safeParse(rawEnv)
 
   if (!parsed.success) {
     console.error('❌ Invalid environment variables')
     console.error(parsed.error.format())
-    process.exit(1)
+    throw new Error('Invalid environment variables')
   }
 
   return parsed.data

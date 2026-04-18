@@ -13,7 +13,7 @@ export default fp(async (app) => {
     const diff = process.hrtime(request.startTime)
     const duration = diff[0] + diff[1] / 1e9
 
-    const route = request.routerPath || request.url
+    const route = request.routeOptions?.url ?? request.url
 
     httpRequestsTotal.inc({
       method: request.method,

@@ -1,27 +1,34 @@
-import { FastifyRequest, FastifyReply } from "fastify";
-import { ZodSchema } from "zod";
-import { AppError } from "@/utils/app-error";
+import { FastifyRequest } from "fastify";
+import { z, ZodSchema } from "zod";
 
-export function validateQuery(schema: ZodSchema) {
+function buildValidationError(result: z.ZodSafeParseError<unknown>) {
+  return new z.ZodError(result.error.issues);
+}
+
+function validateRequestPart<T>(schema: ZodSchema<T>, value: unknown): T {
+  const result = schema.safeParse(value);
+
+  if (!result.success) {
+    throw buildValidationError(result);
+  }
+
+  return result.data;
+}
+
+export function validateBody<T>(schema: ZodSchema<T>) {
   return async function (request: FastifyRequest) {
-    const result = schema.safeParse(request.query);
-
-    if (!result.success) {
-      throw new AppError("Invalid query", 400, "VALIDATION_ERROR");
-    }
-
-    request.query = result.data;
+    request.body = validateRequestPart(schema, request.body);
   };
 }
 
-export function validateParams(schema: ZodSchema) {
+export function validateQuery<T>(schema: ZodSchema<T>) {
   return async function (request: FastifyRequest) {
-    const result = schema.safeParse(request.params);
+    request.query = validateRequestPart(schema, request.query);
+  };
+}
 
-    if (!result.success) {
-      throw new AppError("Invalid params", 400, "VALIDATION_ERROR");
-    }
-
-    request.params = result.data;
+export function validateParams<T>(schema: ZodSchema<T>) {
+  return async function (request: FastifyRequest) {
+    request.params = validateRequestPart(schema, request.params);
   };
 }

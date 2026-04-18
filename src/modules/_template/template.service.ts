@@ -6,9 +6,10 @@ import { RequestContext } from "@/types/request-context";
 export class TemplateService {
   constructor(
     private readonly prisma: PrismaClient,
-    private ctx: RequestContext,
+    private ctx?: RequestContext,
   ) {
     void this.prisma;
+    void this.ctx;
   }
 
   async create(data: CreateTemplateInput) {
