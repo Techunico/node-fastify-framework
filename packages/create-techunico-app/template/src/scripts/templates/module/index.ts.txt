@@ -1,6 +1,0 @@
-import { FastifyInstance } from 'fastify'
-import { {{name}}Routes } from './{{name}}.routes'
-
-export async function {{name}}Module(app: FastifyInstance) {
-  await app.register({{name}}Routes)
-}
