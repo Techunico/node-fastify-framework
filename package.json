@@ -2,11 +2,18 @@
   "name": "nodejs_framework",
   "version": "1.0.0",
   "main": "server.ts",
+  "bin": {
+    "create-techunico-app": "index.js"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/server.ts",
     "typecheck": "tsc --noEmit",
     "make:module": "ts-node -r tsconfig-paths/register src/scripts/make-module.ts",
-    "test": "jest"
+    "test": "jest",
+    "build:template": "ts-node src/scripts/build-template.ts",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
