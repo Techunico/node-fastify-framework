@@ -1,0 +1,14 @@
+import { PrismaClient } from '@/generated/prisma/client'
+import { {{name}}Repository } from './{{name}}.repository'
+
+export class {{name}}Service {
+  private repo: {{name}}Repository
+
+  constructor(prisma: PrismaClient) {
+    this.repo = new {{name}}Repository(prisma)
+  }
+
+  async findAll() {
+    return this.repo.findAll()
+  }
+}

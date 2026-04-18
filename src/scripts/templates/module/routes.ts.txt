@@ -1,0 +1,8 @@
+import { FastifyInstance } from 'fastify'
+import { {{name}}Controller } from './{{name}}.controller'
+
+export async function {{name}}Routes(app: FastifyInstance) {
+  const controller = new {{name}}Controller()
+
+  app.get('/', controller.findAll.bind(controller))
+}
