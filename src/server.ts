@@ -7,7 +7,7 @@ async function start() {
 
   try {
     await app.listen({ port: config.port, host: "0.0.0.0" });
-    app.logger.info(`🚀 Server running on http://localhost:${config.port}`);
+    app.log.info(`🚀 Server running on http://localhost:${config.port}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
