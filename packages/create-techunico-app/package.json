@@ -1,0 +1,11 @@
+{
+  "name": "@techunico/node-framework",
+  "version": "0.1.0",
+  "bin": {
+    "create-techunico-app": "index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ]
+}
