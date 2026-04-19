@@ -6,6 +6,9 @@ function loadEnv(): EnvConfig {
   if ((rawEnv.NODE_ENV ?? 'development') === 'test') {
     rawEnv.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/nodejs_framework_test'
     rawEnv.JWT_SECRET ??= 'test-secret-12345'
+    rawEnv.REDIS_HOST,
+    rawEnv.REDIS_PORT
+    rawEnv.REDIS_PASSWORD
   }
 
   const parsed = envSchema.safeParse(rawEnv)

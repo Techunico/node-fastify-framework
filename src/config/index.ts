@@ -21,4 +21,9 @@ export const config = {
   log: {
     level: env.LOG_LEVEL,
   },
+  redis: {
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password:env.REDIS_PASSWORD
+  },
 };

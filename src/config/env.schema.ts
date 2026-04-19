@@ -14,6 +14,9 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(["info", "warn", "error", "debug"]).default("info"),
   API_PREFIX: z.string().default("/api"),
   API_VERSION: z.string().default("v1"),
+  REDIS_HOST: z.string(),
+  REDIS_PORT: z.coerce.number(),
+  REDIS_PASSWORD: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
