@@ -174,5 +174,6 @@ fs.writeFileSync(
 
 fs.mkdirSync(cliTemplate, { recursive: true })
 fs.cpSync(templateRoot, cliTemplate, { recursive: true })
+fs.rmSync(templateRoot, { recursive: true, force: true })
 
 console.log('✅ Template built & synced to CLI')
