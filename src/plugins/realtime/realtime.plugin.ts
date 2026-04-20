@@ -25,16 +25,24 @@ export default fp(async (app) => {
 
     if (!user) return;
 
+    const key = `ratelimit:ws:${user.tenantId}:${user.id}:send-message`;
+
+    const result = await app.rateLimit.hit(key, 20, 60);
+
+    if (!result.allowed) {
+      return socket.emit("error", "Rate limit exceeded");
+    }
+
     // ✅ Safe rooms (server-controlled only)
-    // socket.join(`user:${user.id}`);
-    // socket.join(`tenant:${user.tenantId}`);
+    socket.join(`user:${user.id}`);
+    socket.join(`tenant:${user.tenantId}`);
 
-  await app.presence.userConnected(user.id, user.tenantId);
+    await app.presence.userConnected(user.id, user.tenantId);
 
-  // 🔥 broadcast online status
-  app.realtime.emitToTenant(user.tenantId, 'presence:online', {
-    userId: user.id,
-  });
+    // 🔥 broadcast online status
+    app.realtime.emitToTenant(user.tenantId, "presence:online", {
+      userId: user.id,
+    });
 
     // Example: join user room
     socket.on("join:user", (userId) => {
@@ -43,17 +51,17 @@ export default fp(async (app) => {
       socket.join(`tenant:${user.tenantId}`);
     });
 
-  socket.on('disconnect', async () => {
-    await app.presence.userDisconnected(user.id, user.tenantId);
+    socket.on("disconnect", async () => {
+      await app.presence.userDisconnected(user.id, user.tenantId);
 
-    const isStillOnline = await app.presence.isOnline(user.id);
+      const isStillOnline = await app.presence.isOnline(user.id);
 
-    if (!isStillOnline) {
-      app.realtime.emitToTenant(user.tenantId, 'presence:offline', {
-        userId: user.id,
-      });
-    }
-  });
+      if (!isStillOnline) {
+        app.realtime.emitToTenant(user.tenantId, "presence:offline", {
+          userId: user.id,
+        });
+      }
+    });
   });
 
   io.use(async (socket: any, next) => {
