@@ -13,7 +13,8 @@ export async function buildApp() {
   await setupPlugins(app);
   await registerModules(app);
 
-  await loadEventListeners(app.event);
+  // await loadEventListeners(app.event);
+  
   setupErrorHandler(app);
   return app;
 }

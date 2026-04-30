@@ -8,6 +8,7 @@ export const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
 
   DATABASE_URL: z.string().min(1),
+  DB_PROVIDER:z.string().min(1),
 
   JWT_SECRET: z.string().min(10),
 
@@ -17,6 +18,7 @@ export const envSchema = z.object({
   REDIS_HOST: z.string(),
   REDIS_PORT: z.coerce.number(),
   REDIS_PASSWORD: z.string().optional(),
+
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

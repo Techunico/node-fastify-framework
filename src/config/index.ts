@@ -12,6 +12,7 @@ export const config = {
 
   db: {
     url: env.DATABASE_URL,
+    provider: env.DB_PROVIDER,
   },
 
   jwt: {
@@ -24,6 +25,6 @@ export const config = {
   redis: {
     host: env.REDIS_HOST,
     port: env.REDIS_PORT,
-    password:env.REDIS_PASSWORD
+    password: env.REDIS_PASSWORD,
   },
 };

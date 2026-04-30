@@ -13,7 +13,11 @@
     "build:template": "ts-node src/scripts/build-template.ts",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
-    "version:major": "npm version major"
+    "version:major": "npm version major",
+    "migrate:pg": "prisma migrate dev --schema=prisma/schema.postgresql.prisma",
+    "migrate:sqlite": "prisma migrate dev --schema=prisma/schema.sqlite.prisma",
+    "generate:pg": "prisma generate --schema=prisma/schema.postgresql.prisma",
+    "generate:sqlite": "prisma generate --schema=prisma/schema.sqlite.prisma"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -23,6 +27,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.7.0",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "bcrypt": "^6.0.0",
