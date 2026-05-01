@@ -10,7 +10,7 @@ function loadEnv(): EnvConfig {
     rawEnv.REDIS_HOST,
     rawEnv.REDIS_PORT
     rawEnv.REDIS_PASSWORD
-
+    rawEnv.PLUGINS ??= 'redis,events'
   }
 
   const parsed = envSchema.safeParse(rawEnv)

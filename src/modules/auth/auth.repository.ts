@@ -1,10 +1,16 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { BaseRepository } from "@/core/base.repository";
 
-export class UserRepository {
-  constructor(private prisma: PrismaClient) {}
+export class UserRepository extends BaseRepository<any> {
+  private prisma: PrismaClient;
+
+  constructor(prisma: PrismaClient) {
+    super(prisma.user);
+    this.prisma = prisma;
+  }
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.model.findUnique({
       where: { email },
     });
   }
@@ -15,6 +21,6 @@ export class UserRepository {
     password: string;
     roleId: number;
   }) {
-    return this.prisma.user.create({ data });
+    return this.model.create({ data });
   }
 }

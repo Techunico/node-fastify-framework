@@ -11,4 +11,5 @@ export default fp(async (app) => {
   const event = new EventService(app.queue);
 
   app.decorate('event', event);
+  console.log('Event plugin registered');
 });

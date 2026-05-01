@@ -1,10 +1,17 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { BaseRepository } from "@/core/base.repository";
 
-export class UserRepository {
-  constructor(private prisma: PrismaClient) {}
+export class UserRepository extends BaseRepository<any> {
+  private prisma: PrismaClient;
 
+  constructor(prisma: PrismaClient) {
+    super(prisma.user);
+    this.prisma = prisma;
+  }
+
+  // ✅ Override base method (custom select)
   async findAll() {
-    return this.prisma.user.findMany({
+    return this.model.findMany({
       select: {
         id: true,
         name: true,
@@ -15,13 +22,13 @@ export class UserRepository {
   }
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.model.findUnique({
       where: { email },
     });
   }
 
   async findAuthUserByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.model.findUnique({
       where: { email },
       include: {
         role: {
@@ -37,10 +44,16 @@ export class UserRepository {
     });
   }
 
-  async create(data: { name: string; email: string; password: string, roleId:number }) {
-    return this.prisma.user.create({ data });
+  async create(data: {
+    name: string;
+    email: string;
+    password: string;
+    roleId: number;
+  }) {
+    return this.model.create({ data });
   }
 
+  // ⚠️ Cross-model access → use prisma directly
   async findRoleByName(name: string) {
     return this.prisma.role.findUnique({
       where: { name },

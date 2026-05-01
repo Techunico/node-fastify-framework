@@ -1,0 +1,7 @@
+import { {{name}}Service } from './{{name}}.service';
+
+declare module '@/types/services' {
+  interface BaseServices {
+    {{name}}: {{name}}Service
+  }
+}

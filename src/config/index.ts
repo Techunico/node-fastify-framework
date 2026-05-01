@@ -8,6 +8,7 @@ export const config = {
       prefix: env.API_PREFIX,
       version: env.API_VERSION,
     },
+    plugins: env.PLUGINS.split(",").map(p => p.trim()).filter(p => p.length > 0), 
   },
 
   db: {

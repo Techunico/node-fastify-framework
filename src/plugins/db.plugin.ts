@@ -13,8 +13,6 @@ async function dbPlugin(app: FastifyInstance) {
 
   let adapter: PrismaPg | PrismaBetterSqlite3;
 
-  console.log("config.db.url", config.db.url);
-
   switch (config.db.provider) {
     case "postgresql":
       pool = new pg.Pool({ connectionString: config.db.url });

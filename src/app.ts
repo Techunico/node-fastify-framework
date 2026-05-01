@@ -13,8 +13,14 @@ export async function buildApp() {
   await setupPlugins(app);
   await registerModules(app);
 
+  /**
+   * this is an experminetal feture
+   * enabling this will allow you to use socket io in your application
+   * but may behave unexpectedly
+   */
+
   // await loadEventListeners(app.event);
-  
+
   setupErrorHandler(app);
   return app;
 }
