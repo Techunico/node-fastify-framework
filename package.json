@@ -5,6 +5,9 @@
   "bin": {
     "create-techunico-app": "index.js"
   },
+  "engines": {
+    "node": ">=16"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/server.ts",
     "typecheck": "tsc --noEmit",
