@@ -1,14 +1,20 @@
-import { PrismaClient } from '@/generated/prisma/client'
-import { {{name}}Repository } from './{{name}}.repository'
-
 export class {{name}}Service {
-  private repo: {{name}}Repository
-
-  constructor(prisma: PrismaClient) {
-    this.repo = new {{name}}Repository(prisma)
-  }
+  constructor(private db: any) {}
 
   async findAll() {
-    return this.repo.findAll()
+    const client = this.db.getClient()
+
+    // Prisma fallback
+    if (client.{{camelName}}?.findMany) {
+      return client.{{camelName}}.findMany()
+    }
+
+    // Mongo fallback
+    if (client.model) {
+      const Model = client.model('{{pascalName}}')
+      return Model.find()
+    }
+
+    return []
   }
 }

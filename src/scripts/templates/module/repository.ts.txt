@@ -2,9 +2,7 @@ import { PrismaClient, {{pascalName}} } from '@/generated/prisma/client'
 import { BaseRepository } from '@/core/base.repository'
 
 export class {{pascalName}}Repository extends BaseRepository<{{pascalName}}> {
-  constructor(private prisma: PrismaClient) {
+  constructor(prisma: PrismaClient) {
     super(prisma.{{camelName}})
   }
-
-  // Add only custom queries here
 }

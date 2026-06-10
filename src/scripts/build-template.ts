@@ -28,9 +28,9 @@ const copy = (src: string, dest: string) => {
 // ========================
 
 copy("src", path.join(templateRoot, "src"));
-copy("prisma", path.join(templateRoot, "prisma"));
+// copy("prisma", path.join(templateRoot, "prisma"));
 copy("tsconfig.json", path.join(templateRoot, "tsconfig.json"));
-copy("prisma.config.ts", path.join(templateRoot, "prisma.config.ts"));
+// copy("prisma.config.ts", path.join(templateRoot, "prisma.config.ts"));
 copy(".env.example", path.join(templateRoot, ".env.example"));
 copy(".gitignore", path.join(templateRoot, ".gitignore"));
 
@@ -47,21 +47,18 @@ fs.rmSync(prismaGeneratedPath, { recursive: true, force: true });
 
 const rootPkg = JSON.parse(fs.readFileSync(resolve("package.json"), "utf-8"));
 
-const allowedScripts = [
+const baseScripts = [
   "dev",
   "build",
   "start",
   "test",
-  "migrate:pg",
-  "migrate:sqlite",
-  "generate:pg",
-  "generate:sqlite",
+  "make:module",
   "plugin:add",
 ];
 
 const filteredScripts: Record<string, string> = {};
 
-for (const key of allowedScripts) {
+for (const key of baseScripts) {
   if (rootPkg.scripts?.[key]) {
     filteredScripts[key] = rootPkg.scripts[key];
   }
@@ -74,8 +71,11 @@ const templatePkg = {
 
   scripts: filteredScripts,
 
-  dependencies: rootPkg.dependencies || {},
-  devDependencies: rootPkg.devDependencies || {},
+  // dependencies: rootPkg.dependencies || {},
+  // devDependencies: rootPkg.devDependencies || {},
+
+  dependencies: {},
+  devDependencies: {},
 };
 
 // write cleaned package.json
@@ -162,7 +162,11 @@ POST /api/v1/auth/login
 
 # 🧠 Notes
 
-- Built on Fastify + Prisma
+Database support:
+- PostgreSQL (Prisma plugin)
+- MongoDB (Mongoose plugin)
+
+---
 - Uses Zod for validation
 - Includes RBAC system
 

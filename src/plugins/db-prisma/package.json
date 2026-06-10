@@ -1,0 +1,10 @@
+{
+  "name": "@techunico/db-prisma",
+  "version": "1.0.0",
+  "dependencies": {
+    "@prisma/client": "^7.7.0",
+    "@prisma/adapter-pg": "^7.7.0",
+    "@prisma/adapter-better-sqlite3": "^7.7.0",
+    "pg": "^8.20.0"
+  }
+}

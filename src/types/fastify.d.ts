@@ -19,6 +19,14 @@ declare module "fastify" {
     error: (error: any, statusCode?: number) => void;
   }
 
+  interface FastifyInstance {
+    db: {
+      connect(): Promise<void>;
+      disconnect(): Promise<void>;
+      getClient(): any;
+    };
+  }
+
   interface FastifyRequest {
     user?: any;
     requestId: string;

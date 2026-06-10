@@ -17,22 +17,43 @@ if (fs.existsSync(modulePath)) {
 
 fs.mkdirSync(modulePath, { recursive: true });
 
-const templateDir = path.join(process.cwd(), "src/scripts/templates/module");
+// 🔍 Detect DB
+const envPath = path.join(process.cwd(), ".env");
+let dbProvider = "postgresql";
 
+if (fs.existsSync(envPath)) {
+  const env = fs.readFileSync(envPath, "utf-8");
+  if (env.includes("DB_PROVIDER=mongodb")) {
+    dbProvider = "mongodb";
+  }
+}
+
+// 🔤 Name helpers
+const pascalName =
+  moduleName.charAt(0).toUpperCase() + moduleName.slice(1);
+
+const camelName =
+  moduleName.charAt(0).toLowerCase() + moduleName.slice(1);
+
+const templateDir = path.join(process.cwd(), "src/scripts/templates/module");
 const files = fs.readdirSync(templateDir);
 
 files.forEach((file) => {
-  const content = fs
-    .readFileSync(path.join(templateDir, file), "utf-8")
-    .replace(/{{name}}/g, moduleName);
+  // skip based on DB
+  if (dbProvider === "mongodb" && file.includes("repository")) return;
+  if (dbProvider === "postgresql" && file.includes("model")) return;
+
+  let content = fs.readFileSync(path.join(templateDir, file), "utf-8");
+
+  content = content
+    .replace(/{{name}}/g, moduleName)
+    .replace(/{{pascalName}}/g, pascalName)
+    .replace(/{{camelName}}/g, camelName);
 
   const baseName = file.replace(".txt", "");
-  let fileName = "";
-  if (baseName !== "index.ts") {
-    fileName = `${moduleName}.${baseName}`;
-  } else{
-    fileName = baseName;
-  } 
+
+  const fileName =
+    baseName !== "index.ts" ? `${moduleName}.${baseName}` : baseName;
 
   fs.writeFileSync(path.join(modulePath, fileName), content);
 });

@@ -3,7 +3,7 @@ import { {{name}}Service } from './{{name}}.service'
 
 export class {{name}}Controller {
   async findAll(request: FastifyRequest, reply: FastifyReply) {
-    const service = new {{name}}Service(request.server.prisma)
+    const service = new {{name}}Service(request.server.db)
     const data = await service.findAll()
 
     return reply.success(data)
