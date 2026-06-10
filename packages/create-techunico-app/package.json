@@ -1,6 +1,6 @@
 {
   "name": "@techunico/node-framework",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "bin": {
     "create-techunico-app": "index.js",
     "techunico": "index.js"
