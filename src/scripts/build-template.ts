@@ -28,18 +28,20 @@ const copy = (src: string, dest: string) => {
 // ========================
 
 copy("src", path.join(templateRoot, "src"));
-// copy("prisma", path.join(templateRoot, "prisma"));
 copy("tsconfig.json", path.join(templateRoot, "tsconfig.json"));
-// copy("prisma.config.ts", path.join(templateRoot, "prisma.config.ts"));
 copy(".env.example", path.join(templateRoot, ".env.example"));
 copy(".gitignore", path.join(templateRoot, ".gitignore"));
 
-//===================
-// Folder to remove
-//===================
+// ========================
+// 🧹 CLEANUP
+// ========================
 
+// Remove generated prisma artifacts if present
 const prismaGeneratedPath = path.join(templateRoot, "src/generated");
-fs.rmSync(prismaGeneratedPath, { recursive: true, force: true });
+
+if (fs.existsSync(prismaGeneratedPath)) {
+  fs.rmSync(prismaGeneratedPath, { recursive: true, force: true });
+}
 
 // ========================
 // 📦 SANITIZE package.json
@@ -68,12 +70,7 @@ const templatePkg = {
   name: "my-app",
   version: "1.0.0",
   private: true,
-
   scripts: filteredScripts,
-
-  // dependencies: rootPkg.dependencies || {},
-  // devDependencies: rootPkg.devDependencies || {},
-
   dependencies: {},
   devDependencies: {},
 };
@@ -84,12 +81,16 @@ fs.writeFileSync(
   JSON.stringify(templatePkg, null, 2),
 );
 
+// ========================
+// 📄 README
+// ========================
+
 const templateReadme = `
 # 🚀 Techunico App
 
 This project was generated using:
 
-npx @techunico/techunico-nodejs-app
+npx @techunico/node-framework
 
 ---
 
@@ -124,7 +125,7 @@ npm run dev
 Base URL:
 
 \`\`\`
-/api/${rootPkg.version?.startsWith("0") ? "v1" : "v1"}
+/api/v1
 \`\`\`
 
 ---
@@ -166,7 +167,6 @@ Database support:
 - PostgreSQL (Prisma plugin)
 - MongoDB (Mongoose plugin)
 
----
 - Uses Zod for validation
 - Includes RBAC system
 
@@ -185,6 +185,8 @@ fs.writeFileSync(path.join(templateRoot, "README.md"), templateReadme.trim());
 
 fs.mkdirSync(cliTemplate, { recursive: true });
 fs.cpSync(templateRoot, cliTemplate, { recursive: true });
+
+// cleanup temp template
 fs.rmSync(templateRoot, { recursive: true, force: true });
 
 console.log("✅ Template built & synced to CLI");
