@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const inquirer = require("inquirer");
+const { composeProject, runPrismaGenerate } = require("./lib/compose");
 
 const args = process.argv.slice(2);
 
@@ -17,7 +18,7 @@ const targetPath = path.join(process.cwd(), projectName);
 const templatePath = path.join(__dirname, "template");
 
 if (!fs.existsSync(templatePath)) {
-  console.error("❌ Template missing");
+  console.error("❌ Template missing. Run `npm run build:template` in the framework repo.");
   process.exit(1);
 }
 
@@ -27,7 +28,6 @@ if (fs.existsSync(targetPath)) {
 }
 
 async function run() {
-  // 🧠 Ask user choices
   const answers = await inquirer.prompt([
     {
       type: "list",
@@ -58,20 +58,14 @@ async function run() {
 
   const { db, pkgManager, plugins } = answers;
 
-  // 📁 Copy template
   fs.mkdirSync(targetPath, { recursive: true });
   fs.cpSync(templatePath, targetPath, { recursive: true, force: true });
-
-  // ========================
-  // 📦 PACKAGE.JSON SETUP
-  // ========================
 
   const pkgPath = path.join(targetPath, "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 
   pkg.name = projectName;
 
-  // ✅ Base deps
   pkg.dependencies = {
     fastify: "^5.8.5",
     "fastify-plugin": "^5.1.0",
@@ -82,17 +76,15 @@ async function run() {
     jsonwebtoken: "^9.0.3",
     "prom-client": "^15.1.3",
     "tsconfig-paths": "^4.2.0",
+    bcrypt: "^6.0.0",
   };
 
   pkg.devDependencies = {
     typescript: "^6.0.2",
     "ts-node-dev": "^2.0.0",
     "@types/node": "^25.6.0",
+    "@types/bcrypt": "^6.0.0",
   };
-
-  // ========================
-  // 🧠 DB
-  // ========================
 
   if (db === "postgresql") {
     Object.assign(pkg.dependencies, {
@@ -103,26 +95,30 @@ async function run() {
 
     Object.assign(pkg.devDependencies, {
       prisma: "^7.7.0",
+      "ts-node": "^10.9.2",
+      "@types/pg": "^8.20.0",
     });
 
-    pkg.scripts["generate"] = "prisma generate";
-    pkg.scripts["migrate"] = "prisma migrate dev";
+    pkg.scripts.generate = "prisma generate";
+    pkg.scripts.migrate = "prisma migrate dev";
+    pkg.scripts.seed = "ts-node prisma/seed.ts";
+    pkg.prisma = {
+      seed: "ts-node prisma/seed.ts",
+    };
   }
 
   if (db === "mongodb") {
-    pkg.dependencies["mongoose"] = "^8.5.0";
+    pkg.dependencies.mongoose = "^8.5.0";
+    pkg.devDependencies["ts-node"] = "^10.9.2";
+    pkg.scripts.seed = "ts-node scripts/seed.ts";
   }
 
-  // ========================
-  // 🔌 Plugins
-  // ========================
-
   if (plugins.includes("redis")) {
-    pkg.dependencies["ioredis"] = "^5.10.1";
+    pkg.dependencies.ioredis = "^5.10.1";
   }
 
   if (plugins.includes("queue")) {
-    pkg.dependencies["bullmq"] = "^5.74.1";
+    pkg.dependencies.bullmq = "^5.74.1";
   }
 
   if (plugins.includes("socket")) {
@@ -131,47 +127,20 @@ async function run() {
 
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
 
-  // ========================
-  // 🌍 ENV SETUP
-  // ========================
+  composeProject(targetPath, { db, plugins });
 
-  const envExamplePath = path.join(targetPath, ".env.example");
   const envPath = path.join(targetPath, ".env");
-
-  if (fs.existsSync(envExamplePath)) {
-    fs.copyFileSync(envExamplePath, envPath);
-  }
-
   let envContent = fs.readFileSync(envPath, "utf-8");
 
-  envContent = envContent.replace("DB_PROVIDER=", `DB_PROVIDER=${db}`);
-
-  if (db === "postgresql") {
-    envContent = envContent.replace(
-      "DATABASE_URL=",
-      "DATABASE_URL=postgresql://user:password@localhost:5432/db"
-    );
+  if (plugins.length > 0) {
+    envContent = envContent.replace(/^PLUGINS=.*$/m, `PLUGINS=${plugins.join(",")}`);
+  } else {
+    envContent = envContent.replace(/^PLUGINS=.*$/m, "PLUGINS=");
   }
-
-  if (db === "mongodb") {
-    envContent = envContent.replace(
-      "MONGO_URI=",
-      "MONGO_URI=mongodb://localhost:27017/db"
-    );
-  }
-
-  envContent = envContent.replace(
-    "PLUGINS=",
-    `PLUGINS=${plugins.join(",")}`
-  );
 
   fs.writeFileSync(envPath, envContent);
 
   console.log(`\n✅ Project ${projectName} created`);
-
-  // ========================
-  // 📦 INSTALL
-  // ========================
 
   console.log(`\n📦 Installing dependencies using ${pkgManager}...\n`);
 
@@ -187,9 +156,13 @@ async function run() {
     stdio: "inherit",
   });
 
-  // ========================
-  // 🚀 NEXT STEPS
-  // ========================
+  if (db === "postgresql") {
+    console.log("\n🔧 Generating Prisma client...\n");
+    runPrismaGenerate(targetPath);
+  }
+
+  const devCmd =
+    pkgManager === "npm" ? "npm run dev" : `${pkgManager} dev`;
 
   console.log(`
 🚀 Next steps:
@@ -198,10 +171,15 @@ cd ${projectName}
 `);
 
   if (db === "postgresql") {
-    console.log(`npx prisma generate`);
+    console.log(`${pkgManager === "npm" ? "npm run migrate" : pkgManager + " migrate"}   # after database is running`);
+    console.log(`${pkgManager === "npm" ? "npm run seed" : pkgManager + " seed"}       # optional`);
   }
 
-  console.log(`${pkgManager === "npm" ? "npm run dev" : pkgManager + " dev"}`);
+  if (db === "mongodb") {
+    console.log(`${pkgManager === "npm" ? "npm run seed" : pkgManager + " seed"}       # after MongoDB is running`);
+  }
+
+  console.log(devCmd);
 }
 
 run();
