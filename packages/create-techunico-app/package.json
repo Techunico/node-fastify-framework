@@ -10,6 +10,9 @@
   },
   "files": [
     "index.js",
-    "template"
+    "lib",
+    "template",
+    "overlays",
+    "assets"
   ]
 }
