@@ -2,9 +2,10 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import { AppError } from '@/utils/app-error'
 
 type JwtPayload = {
-  id: number
+  id: string
   role?: string
   permissions?: string[]
+  type?: string
 }
 
 export async function authGuard(
@@ -28,19 +29,21 @@ export async function authGuard(
   }
 
   try {
-    const decoded = request.server.jwt.verify(token) as JwtPayload
+    const decoded = request.server.jwt.verifyAccess(token) as JwtPayload
 
     // ✅ Attach user to request context
     request.ctx.user = {
       id: decoded.id,
       role: decoded.role,
       permissions: decoded.permissions,
+      type: (decoded as any).userType || decoded.type, // Support both for safety
     }
 
     // ✅ Enrich logger with user + request context
     request.log = request.log.child({
       userId: decoded.id,
       role: decoded.role,
+      type: decoded.type,
       requestId: request.ctx.requestId,
     })
 

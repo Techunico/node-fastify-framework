@@ -5,7 +5,7 @@ import { AppError } from "@/utils/app-error";
 import { RequestContext } from "@/types/request-context";
 
 export interface AuthenticatedUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: string | null;
@@ -82,7 +82,7 @@ export class AuthService {
     };
   }): AuthenticatedUser {
     return {
-      id: user.id,
+      id: user.id as unknown as string,
       name: user.name,
       email: user.email,
       role: user.role?.name ?? null,

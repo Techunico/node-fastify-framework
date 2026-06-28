@@ -8,23 +8,27 @@ declare module "fastify" {
   interface FastifyInstance {
     logger: Logger;
     prisma: PrismaClient;
-    jwt: {
-      sign: (payload: any) => string;
-      verify: (token: string) => any;
-    };
-  }
-
-  interface FastifyReply {
-    success: (data: any, statusCode?: number) => void;
-    error: (error: any, statusCode?: number) => void;
-  }
-
-  interface FastifyInstance {
     db: {
       connect(): Promise<void>;
       disconnect(): Promise<void>;
       getClient(): any;
     };
+    jwt: {
+      sign: (payload: any, userType: UserType, tokenType: TokenType) => string;
+      verifyToken: (token: string) => any;
+      verifyAccess: (token: string) => any;
+      verifyRefresh: (token: string) => any;
+      refresh: (refreshToken: string) => {
+        accessToken: string;
+      };
+    };
+
+    cloudinary: CloudinaryService;
+  }
+
+  interface FastifyReply {
+    success: (data: any, statusCode?: number) => void;
+    error: (error: any, statusCode?: number) => void;
   }
 
   interface FastifyRequest {

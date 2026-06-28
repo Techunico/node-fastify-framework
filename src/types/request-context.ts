@@ -1,8 +1,9 @@
 export interface RequestContext {
-  requestId: string
+  requestId: string;
   user?: {
-    id: number
-    role?: string
-    permissions?: string[]
-  }
+    id: string;
+    role?: string;
+    permissions?: string[];
+    type?: string;
+  };
 }
