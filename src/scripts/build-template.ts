@@ -175,13 +175,36 @@ fs.writeFileSync(path.join(templateRoot, "README.md"), templateReadme.trim());
 fs.mkdirSync(cliTemplate, { recursive: true });
 fs.cpSync(templateRoot, cliTemplate, { recursive: true });
 
-if (fs.existsSync(resolve("prisma/schema.postgresql.prisma"))) {
+function syncPrismaAssets() {
+  const schemaSource = resolve("prisma/schema.postgresql.prisma");
+  const seedSource = resolve("prisma/seed.ts");
+  const configSource = resolve("prisma/starter/prisma.config.ts");
+
+  if (!fs.existsSync(schemaSource)) {
+    return;
+  }
+
+  fs.rmSync(cliAssetsPrisma, { recursive: true, force: true });
   fs.mkdirSync(cliAssetsPrisma, { recursive: true });
+
   fs.copyFileSync(
-    resolve("prisma/schema.postgresql.prisma"),
+    schemaSource,
     path.join(cliAssetsPrisma, "schema.postgresql.prisma"),
   );
+
+  if (fs.existsSync(seedSource)) {
+    fs.copyFileSync(seedSource, path.join(cliAssetsPrisma, "seed.ts"));
+  }
+
+  if (fs.existsSync(configSource)) {
+    fs.copyFileSync(
+      configSource,
+      path.join(cliAssetsPrisma, "prisma.config.ts.template"),
+    );
+  }
 }
+
+syncPrismaAssets();
 
 fs.rmSync(templateRoot, { recursive: true, force: true });
 

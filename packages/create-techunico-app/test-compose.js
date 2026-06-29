@@ -84,6 +84,7 @@ function createProject(name, db) {
 
   setupPackage(targetPath, db);
   composeProject(targetPath, { db, plugins: [] });
+  verifyTemplateHasNoGeneratedClient(targetPath);
 
   const envPath = path.join(targetPath, ".env");
   let envContent = fs.readFileSync(envPath, "utf-8");
@@ -110,19 +111,36 @@ function verifyMongoProject(targetPath) {
 
   const pkg = JSON.parse(fs.readFileSync(path.join(targetPath, "package.json"), "utf-8"));
   assert(!pkg.dependencies["@prisma/client"], "Prisma dependency should be removed");
+  assert(!pkg.dependencies.prisma, "Prisma CLI dependency should be removed");
+  assert(!pkg.prisma, "Prisma package config should be removed");
   assert(pkg.dependencies.mongoose, "Mongoose dependency should exist");
 }
 
 function verifyPostgresProject(targetPath) {
   assertExists(targetPath, "prisma/schema.prisma");
+  assertExists(targetPath, "prisma/seed.ts");
   assertExists(targetPath, "prisma.config.ts");
   assertExists(targetPath, "src/generated/prisma");
   assertExists(targetPath, "src/plugins/db-prisma");
   assertMissing(targetPath, "src/plugins/db-mongoose");
+  assertMissing(targetPath, "prisma/migrations");
+
+  const config = fs.readFileSync(
+    path.join(targetPath, "prisma.config.ts"),
+    "utf-8",
+  );
+  assert(
+    config.includes('schema: "prisma/schema.prisma"'),
+    "prisma.config.ts should reference prisma/schema.prisma",
+  );
 
   const pkg = JSON.parse(fs.readFileSync(path.join(targetPath, "package.json"), "utf-8"));
   assert(pkg.dependencies["@prisma/client"], "Prisma dependency should exist");
   assert(!pkg.dependencies.mongoose, "Mongoose dependency should be removed");
+}
+
+function verifyTemplateHasNoGeneratedClient(targetPath) {
+  assertMissing(targetPath, "src/generated/prisma");
 }
 
 function typecheckProject(targetPath) {
