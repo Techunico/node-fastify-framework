@@ -31,15 +31,6 @@ function removeIfExists(projectRoot, relativePath) {
   fs.rmSync(fullPath, { recursive: true, force: true });
 }
 
-function copyRecursive(src, dest) {
-  if (!fs.existsSync(src)) {
-    return;
-  }
-
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.cpSync(src, dest, { recursive: true });
-}
-
 function applyOverlay(projectRoot, overlayDir) {
   if (!fs.existsSync(overlayDir)) {
     return;
@@ -64,12 +55,6 @@ function applyOverlay(projectRoot, overlayDir) {
   };
 
   walk(overlayDir, projectRoot);
-}
-
-function writeFile(projectRoot, relativePath, content) {
-  const fullPath = resolveProject(projectRoot, relativePath);
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, content);
 }
 
 function readEnvFile(projectRoot) {
@@ -145,36 +130,24 @@ function setupPostgreSQL(projectRoot, assetsDir) {
   fs.mkdirSync(path.dirname(schemaTarget), { recursive: true });
   fs.copyFileSync(schemaSource, schemaTarget);
 
-  const migrationsSource = path.join(prismaAssetsDir, "migrations");
-  if (fs.existsSync(migrationsSource)) {
-    copyRecursive(
-      migrationsSource,
-      resolveProject(projectRoot, "prisma/migrations"),
-    );
-  }
-
   const seedSource = path.join(prismaAssetsDir, "seed.ts");
   if (fs.existsSync(seedSource)) {
     fs.copyFileSync(seedSource, resolveProject(projectRoot, "prisma/seed.ts"));
   }
 
-  writeFile(
-    projectRoot,
-    "prisma.config.ts",
-    `import "dotenv/config";
-import { defineConfig } from "prisma/config";
+  const configSource = path.join(
+    prismaAssetsDir,
+    "prisma.config.ts.template",
+  );
+  if (!fs.existsSync(configSource)) {
+    throw new Error(
+      "Missing prisma.config.ts.template in CLI assets. Run `npm run build:template` in the framework repo.",
+    );
+  }
 
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-    seed: "ts-node prisma/seed.ts",
-  },
-  datasource: {
-    url: process.env.DATABASE_URL,
-  },
-});
-`,
+  fs.copyFileSync(
+    configSource,
+    resolveProject(projectRoot, "prisma.config.ts"),
   );
 
   const overlayDir = path.join(path.dirname(assetsDir), "overlays", "postgresql");
