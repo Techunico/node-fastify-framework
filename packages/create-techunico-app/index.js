@@ -18,7 +18,7 @@ const targetPath = path.join(process.cwd(), projectName);
 const templatePath = path.join(__dirname, "template");
 
 if (!fs.existsSync(templatePath)) {
-  console.error("❌ Template missing. Run `npm run build:template` in the framework repo.");
+  console.error("❌ Template missing");
   process.exit(1);
 }
 

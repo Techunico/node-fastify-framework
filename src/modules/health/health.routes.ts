@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 
 export async function healthRoutes(app: FastifyInstance) {
-  // Liveness
   app.get("/health", async (request, reply) => {
     return reply.success({
       status: "ok",
@@ -10,35 +9,25 @@ export async function healthRoutes(app: FastifyInstance) {
     });
   });
 
-  // Readiness
   app.get("/ready", async (request, reply) => {
     const checks: Record<string, { status: "ok" | "fail"; message?: string }> =
       {};
 
-    // Database check
-    try {
-      await request.server.prisma.$queryRaw`SELECT 1`;
-      checks.database = { status: "ok" };
-    } catch (err) {
-      request.log.error(err);
-      checks.database = { status: "fail", message: "Database unreachable" };
-    }
+    const database = await request.server.db.healthCheck();
+    checks.database = database;
 
-    // Redis check
-    try {
-      const pong = await app.redis.ping();
-      checks.redis =
-        pong === "PONG"
-          ? { status: "ok" }
-          : { status: "fail", message: `Unexpected ping response: ${pong}` };
-    } catch (err) {
-      request.log.error(err);
-      checks.redis = { status: "fail", message: "Redis unreachable" };
+    if (app.redis) {
+      try {
+        const pong = await app.redis.ping();
+        checks.redis =
+          pong === "PONG"
+            ? { status: "ok" }
+            : { status: "fail", message: `Unexpected ping response: ${pong}` };
+      } catch (err) {
+        request.log.error(err);
+        checks.redis = { status: "fail", message: "Redis unreachable" };
+      }
     }
-
-    // Add more services here the same way:
-    // checks.s3 = { status: 'ok' }
-    // checks.thirdPartyApi = { status: 'fail', message: '...' }
 
     const allReady = Object.values(checks).every((c) => c.status === "ok");
 

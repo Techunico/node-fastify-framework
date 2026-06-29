@@ -1,18 +1,18 @@
-import { UserRepository } from './user.repository'
-import { PrismaClient } from '../../generated/prisma'
+import { DatabaseAdapter } from "@/core/interfaces/database";
 
 export class UserService {
-  private repo: UserRepository
-
-  constructor(prisma: PrismaClient) {
-    this.repo = new UserRepository(prisma)
-  }
+  constructor(private readonly db: DatabaseAdapter) {}
 
   async getAllUsers() {
-    return this.repo.findAll()
+    return this.db.repositories.user.findAll();
   }
 
-  async createUser(data: { name: string; email: string; password:string; roleId:number }) {
-    return this.repo.create(data)
+  async createUser(data: {
+    name: string;
+    email: string;
+    password: string;
+    roleId: string;
+  }) {
+    return this.db.repositories.user.create(data);
   }
 }

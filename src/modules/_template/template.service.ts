@@ -1,23 +1,19 @@
-import { PrismaClient } from "../../generated/prisma";
 import { CreateTemplateInput } from "./template.schema";
 import { AppError } from "@/utils/app-error";
 import { RequestContext } from "@/types/request-context";
+import { DatabaseAdapter } from "@/core/interfaces/database";
 
 export class TemplateService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly db: DatabaseAdapter,
     private ctx?: RequestContext,
   ) {
-    void this.prisma;
+    void this.db;
     void this.ctx;
   }
 
   async create(data: CreateTemplateInput) {
     void data;
-
-    // ❗ No dummy return
-    // This will be implemented with DB in next phase
-
     throw new Error("Not implemented: connect DB layer");
   }
 

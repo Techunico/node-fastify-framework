@@ -39,9 +39,7 @@ const templateDir = path.join(process.cwd(), "src/scripts/templates/module");
 const files = fs.readdirSync(templateDir);
 
 files.forEach((file) => {
-  // skip based on DB
-  if (dbProvider === "mongodb" && file.includes("repository")) return;
-  if (dbProvider === "postgresql" && file.includes("model")) return;
+  if (file.includes("repository") || file.includes("model")) return;
 
   let content = fs.readFileSync(path.join(templateDir, file), "utf-8");
 

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { Permission, Role } from "../src/models/rbac.model";
+import { Permission, Role } from "../src/plugins/db-mongoose/models/rbac.model";
 
 async function main() {
   await mongoose.connect(process.env.MONGO_URI!);

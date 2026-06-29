@@ -11,12 +11,6 @@ const PRISMA_ARTIFACTS = [
 
 const MONGOOSE_ARTIFACTS = ["src/plugins/db-mongoose"];
 
-const PRISMA_REPOSITORY_FILES = [
-  "src/modules/auth/auth.repository.ts",
-  "src/modules/user/user.repository.ts",
-  "src/modules/metrics/metrics.repository.ts",
-];
-
 function resolveProject(projectRoot, relativePath) {
   return path.join(projectRoot, relativePath);
 }
@@ -157,10 +151,6 @@ function setupPostgreSQL(projectRoot, assetsDir) {
 function setupMongoDB(projectRoot) {
   for (const artifact of PRISMA_ARTIFACTS) {
     removeIfExists(projectRoot, artifact);
-  }
-
-  for (const file of PRISMA_REPOSITORY_FILES) {
-    removeIfExists(projectRoot, file);
   }
 
   const overlayDir = path.join(__dirname, "..", "overlays", "mongodb");

@@ -1,25 +1,41 @@
 import mongoose from "mongoose";
+import {
+  DatabaseAdapter,
+  HealthCheckResult,
+} from "@/core/interfaces/database";
+import { MongooseMetricsRepository } from "./repositories/mongoose-metrics.repository";
+import { MongooseUserRepository } from "./repositories/mongoose-user.repository";
 
-export interface DatabaseAdapter {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  getClient(): unknown;
-}
+export class MongooseDatabaseAdapter implements DatabaseAdapter {
+  readonly repositories = {
+    user: new MongooseUserRepository(),
+    metrics: new MongooseMetricsRepository(),
+  };
 
-export class MongooseAdapter implements DatabaseAdapter {
-  async connect() {
-    if (!process.env.MONGO_URI) {
+  constructor(private readonly uri: string) {}
+
+  async connect(): Promise<void> {
+    if (!this.uri) {
       throw new Error("MONGO_URI is not defined");
     }
 
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(this.uri);
   }
 
-  async disconnect() {
+  async disconnect(): Promise<void> {
     await mongoose.disconnect();
   }
 
-  getClient() {
-    return mongoose;
+  async healthCheck(): Promise<HealthCheckResult> {
+    const readyState = mongoose.connection.readyState;
+
+    if (readyState === 1) {
+      return { status: "ok" };
+    }
+
+    return {
+      status: "fail",
+      message: "Database not connected",
+    };
   }
 }

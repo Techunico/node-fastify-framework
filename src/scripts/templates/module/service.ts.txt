@@ -1,20 +1,11 @@
-export class {{name}}Service {
-  constructor(private db: any) {}
+import { DatabaseAdapter } from "@/core/interfaces/database";
+
+export class {{pascalName}}Service {
+  constructor(private readonly db: DatabaseAdapter) {
+    void this.db;
+  }
 
   async findAll() {
-    const client = this.db.getClient()
-
-    // Prisma fallback
-    if (client.{{camelName}}?.findMany) {
-      return client.{{camelName}}.findMany()
-    }
-
-    // Mongo fallback
-    if (client.model) {
-      const Model = client.model('{{pascalName}}')
-      return Model.find()
-    }
-
-    return []
+    throw new Error("Not implemented: register a repository in the database adapter");
   }
 }

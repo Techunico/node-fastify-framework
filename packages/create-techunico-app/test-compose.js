@@ -106,7 +106,7 @@ function verifyMongoProject(targetPath) {
   assertMissing(targetPath, "src/generated");
   assertMissing(targetPath, "src/plugins/db-prisma");
   assertExists(targetPath, "src/plugins/db-mongoose");
-  assertExists(targetPath, "src/models/rbac.model.ts");
+  assertExists(targetPath, "src/plugins/db-mongoose/models/rbac.model.ts");
   assertExists(targetPath, "scripts/seed.ts");
 
   const pkg = JSON.parse(fs.readFileSync(path.join(targetPath, "package.json"), "utf-8"));

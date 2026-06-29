@@ -1,27 +1,26 @@
-import { envSchema, EnvConfig } from './env.schema'
+import { envSchema, EnvConfig } from "./env.schema";
 
 function loadEnv(): EnvConfig {
-  const rawEnv = { ...process.env }
+  const rawEnv = { ...process.env };
 
-  if ((rawEnv.NODE_ENV ?? 'development') === 'test') {
-    rawEnv.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/nodejs_framework_test'
-    rawEnv.DB_PROVIDER
-    rawEnv.JWT_SECRET ??= 'test-secret-12345'
-    rawEnv.REDIS_HOST,
-    rawEnv.REDIS_PORT
-    rawEnv.REDIS_PASSWORD
-    rawEnv.PLUGINS ??= 'redis,events'
+  if ((rawEnv.NODE_ENV ?? "development") === "test") {
+    rawEnv.DATABASE_URL ??= "postgresql://test:test@localhost:5432/nodejs_framework_test";
+    rawEnv.DB_PROVIDER ??= "postgresql";
+    rawEnv.JWT_SECRET ??= "test-secret-12345";
+    rawEnv.REDIS_HOST ??= "127.0.0.1";
+    rawEnv.REDIS_PORT ??= "6379";
+    rawEnv.PLUGINS ??= "";
   }
 
-  const parsed = envSchema.safeParse(rawEnv)
+  const parsed = envSchema.safeParse(rawEnv);
 
   if (!parsed.success) {
-    console.error('❌ Invalid environment variables')
-    console.error(parsed.error.format())
-    throw new Error('Invalid environment variables')
+    console.error("❌ Invalid environment variables");
+    console.error(parsed.error.format());
+    throw new Error("Invalid environment variables");
   }
 
-  return parsed.data
+  return parsed.data;
 }
 
-export const env = loadEnv()
+export const env = loadEnv();

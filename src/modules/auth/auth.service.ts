@@ -1,8 +1,8 @@
 import bcrypt from "bcrypt";
-import { UserRepository } from "@/modules/user/user.repository";
-import { PrismaClient } from "@/generated/prisma/client";
+import { DatabaseAdapter } from "@/core/interfaces/database";
 import { AppError } from "@/utils/app-error";
 import { RequestContext } from "@/types/request-context";
+import { AuthUserRecord } from "@/core/interfaces/repositories/user.repository";
 
 export interface AuthenticatedUser {
   id: string;
@@ -14,36 +14,33 @@ export interface AuthenticatedUser {
 }
 
 export class AuthService {
-  private repo: UserRepository;
-
   constructor(
-    prisma: PrismaClient,
+    private readonly db: DatabaseAdapter,
     private ctx?: RequestContext,
-  ) {
-    this.repo = new UserRepository(prisma);
-  }
+  ) {}
 
   async register(data: { name: string; email: string; password: string }) {
-    const existing = await this.repo.findByEmail(data.email);
+    const userRepo = this.db.repositories.user;
+    const existing = await userRepo.findByEmail(data.email);
 
     if (existing) {
       throw new AppError("Email already exists", 400, "EMAIL_EXISTS");
     }
 
     const hashed = await bcrypt.hash(data.password, 10);
-    const userRole = await this.repo.findRoleByName("user");
+    const userRole = await userRepo.findRoleByName("user");
 
     if (!userRole) {
       throw new AppError("Default user role is missing", 500, "INTERNAL_SERVER_ERROR");
     }
 
-    await this.repo.create({
+    await userRepo.create({
       ...data,
       password: hashed,
       roleId: userRole.id,
     });
 
-    const user = await this.repo.findAuthUserByEmail(data.email);
+    const user = await userRepo.findAuthUserByEmail(data.email);
 
     if (!user) {
       throw new AppError("User not found after registration", 500, "INTERNAL_SERVER_ERROR");
@@ -55,7 +52,7 @@ export class AuthService {
   async login(email: string, password: string) {
     void this.ctx;
 
-    const user = await this.repo.findAuthUserByEmail(email);
+    const user = await this.db.repositories.user.findAuthUserByEmail(email);
 
     if (!user) {
       throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
@@ -70,19 +67,9 @@ export class AuthService {
     return this.toAuthenticatedUser(user);
   }
 
-  private toAuthenticatedUser(user: {
-    id: number;
-    name: string;
-    email: string;
-    password: string;
-    createdAt: Date;
-    role: null | {
-      name: string;
-      permissions: Array<{ name: string }>;
-    };
-  }): AuthenticatedUser {
+  private toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {
     return {
-      id: user.id as unknown as string,
+      id: user.id,
       name: user.name,
       email: user.email,
       role: user.role?.name ?? null,

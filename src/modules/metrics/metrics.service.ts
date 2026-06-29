@@ -1,14 +1,9 @@
-import { PrismaClient } from '@/generated/prisma/client'
-import { metricsRepository } from './metrics.repository'
+import { DatabaseAdapter } from "@/core/interfaces/database";
 
 export class metricsService {
-  private repo: metricsRepository
-
-  constructor(prisma: PrismaClient) {
-    this.repo = new metricsRepository(prisma)
-  }
+  constructor(private readonly db: DatabaseAdapter) {}
 
   async findAll() {
-    return this.repo.findAll()
+    return this.db.repositories.metrics.findAll();
   }
 }

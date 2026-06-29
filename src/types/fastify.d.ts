@@ -1,18 +1,13 @@
 import "fastify";
 import { Logger } from "pino";
-import { PrismaClient } from "../generated/prisma";
+import { DatabaseAdapter } from "@/core/interfaces/database";
 import { RequestContext } from "./request-context";
 import { Services } from "./services";
 
 declare module "fastify" {
   interface FastifyInstance {
     logger: Logger;
-    prisma: PrismaClient;
-    db: {
-      connect(): Promise<void>;
-      disconnect(): Promise<void>;
-      getClient(): any;
-    };
+    db: DatabaseAdapter;
     jwt: {
       sign: (payload: any, userType: UserType, tokenType: TokenType) => string;
       verifyToken: (token: string) => any;

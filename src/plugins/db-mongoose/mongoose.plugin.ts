@@ -1,9 +1,10 @@
 import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
-import { MongooseAdapter } from "./mongoose.adapter";
+import { config } from "@/config";
+import { MongooseDatabaseAdapter } from "./mongoose.adapter";
 
 async function mongoosePlugin(app: FastifyInstance) {
-  const db = new MongooseAdapter();
+  const db = new MongooseDatabaseAdapter(config.db.url);
 
   await db.connect();
 
