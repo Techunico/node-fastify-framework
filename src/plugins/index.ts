@@ -13,6 +13,9 @@ import redisPlugin from "./redis/redis.plugin";
 import cachePlugin from "./cache/cache.plugin";
 import queuePlugin from "./queue/queue.plugin";
 import eventsPlugin from "./events/events.plugin";
+import GeoPlugin from "./geo/plugin";
+import CloudinaryPlugin from "./cloudinary/cloudinary.plugin";
+import PaymentPlugin from "./payment/plugin";
 
 type DbProvider = "postgresql" | "mongodb";
 
@@ -43,9 +46,8 @@ export async function registerPlugins(app: FastifyInstance) {
   await app.register(contextPlugin);
   await app.register(servicesPlugin);
 
-  // 🔌 Optional plugins
+  // 🔌 Optional plugins (driven by PLUGINS env)
   const enabled = config.app.plugins;
-
   const isEnabled = (name: string) => enabled.includes(name);
 
   // ✅ Redis
@@ -60,6 +62,21 @@ export async function registerPlugins(app: FastifyInstance) {
     } else {
       await app.register(cachePlugin);
     }
+  }
+
+  // ✅ Geo (optional cache integration when cache was registered first)
+  if (isEnabled("geo")) {
+    await app.register(GeoPlugin);
+  }
+
+  // ✅ Cloudinary media
+  if (isEnabled("cloudinary")) {
+    await app.register(CloudinaryPlugin);
+  }
+
+  // ✅ Payment gateways (Razorpay / Mock)
+  if (isEnabled("payment")) {
+    await app.register(PaymentPlugin);
   }
 
   // ✅ Queue (depends on Redis)

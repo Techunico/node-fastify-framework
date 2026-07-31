@@ -1,22 +1,23 @@
-import mongoose from "mongoose";
+import { Schema } from "mongoose";
+import { registerModel } from "@/core/register-model";
 
-const permissionSchema = new mongoose.Schema({
+const permissionSchema = new Schema({
   name: { type: String, unique: true, required: true },
 });
 
-const roleSchema = new mongoose.Schema({
+const roleSchema = new Schema({
   name: { type: String, unique: true, required: true },
-  permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
+  permissions: [{ type: Schema.Types.ObjectId, ref: "Permission" }],
 });
 
-const userSchema = new mongoose.Schema({
+const userSchema = new Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
-  role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
+  role: { type: Schema.Types.ObjectId, ref: "Role" },
   createdAt: { type: Date, default: Date.now },
 });
 
-export const Permission = mongoose.model("Permission", permissionSchema);
-export const Role = mongoose.model("Role", roleSchema);
-export const User = mongoose.model("User", userSchema);
+export const Permission = registerModel("Permission", permissionSchema);
+export const Role = registerModel("Role", roleSchema);
+export const User = registerModel("User", userSchema);

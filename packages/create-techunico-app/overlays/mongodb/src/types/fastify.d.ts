@@ -2,6 +2,9 @@ import "fastify";
 import { Logger } from "pino";
 import { RequestContext } from "./request-context";
 import { Services } from "./services";
+import type { CloudinaryService } from "../plugins/cloudinary/cloudinary.service";
+import type { GeoService } from "../plugins/geo/service";
+import type { PaymentService } from "../plugins/payment/service";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -10,6 +13,7 @@ declare module "fastify" {
       connect(): Promise<void>;
       disconnect(): Promise<void>;
       getClient(): unknown;
+      isConnected?(): boolean;
     };
     jwt: {
       sign: (payload: any, userType: UserType, tokenType: TokenType) => string;
@@ -20,6 +24,15 @@ declare module "fastify" {
         accessToken: string;
       };
     };
+
+    /** Present when PLUGINS includes cloudinary. */
+    cloudinary?: CloudinaryService;
+
+    /** Present when PLUGINS includes geo. */
+    geo?: GeoService;
+
+    /** Present when PLUGINS includes payment. */
+    payment?: PaymentService;
   }
 
   interface FastifyReply {

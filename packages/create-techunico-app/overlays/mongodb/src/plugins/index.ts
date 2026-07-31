@@ -11,6 +11,9 @@ import redisPlugin from "./redis/redis.plugin";
 import cachePlugin from "./cache/cache.plugin";
 import queuePlugin from "./queue/queue.plugin";
 import eventsPlugin from "./events/events.plugin";
+import GeoPlugin from "./geo/plugin";
+import CloudinaryPlugin from "./cloudinary/cloudinary.plugin";
+import PaymentPlugin from "./payment/plugin";
 
 type DbProvider = "mongodb";
 
@@ -51,6 +54,18 @@ export async function registerPlugins(app: FastifyInstance) {
     } else {
       await app.register(cachePlugin);
     }
+  }
+
+  if (isEnabled("geo")) {
+    await app.register(GeoPlugin);
+  }
+
+  if (isEnabled("cloudinary")) {
+    await app.register(CloudinaryPlugin);
+  }
+
+  if (isEnabled("payment")) {
+    await app.register(PaymentPlugin);
   }
 
   if (isEnabled("queue")) {
