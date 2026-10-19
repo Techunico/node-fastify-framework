@@ -1,17 +1,20 @@
-import { config } from "./config/app";
+// Load .env before anything reads configuration.
+import "dotenv/config";
+import { config } from "./config";
 import { buildApp } from "./app";
-import 'dotenv/config'
 
 async function start() {
   const app = await buildApp();
 
   try {
-    await app.listen({ port: config.port, host: "0.0.0.0" });
-    app.log.info(`🚀 Server running on http://localhost:${config.port}`);
+    await app.listen({ port: config.app.port, host: config.app.host });
   } catch (err) {
-    console.error(err);
+    app.log.error(err);
     process.exit(1);
   }
 }
 
-start();
+start().catch((err) => {
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(1);
+});

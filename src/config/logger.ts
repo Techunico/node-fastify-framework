@@ -1,7 +1,9 @@
 import { config } from '@/config'
+import { loggerRedaction } from '@/core/log-redaction'
 
 export const loggerConfig = {
   level: config.log.level,
+  redact: loggerRedaction,
 
   transport:
     config.app.env === 'development'

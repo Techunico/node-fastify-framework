@@ -18,6 +18,7 @@ import type {
   CloudinaryUploadResult,
   CloudinaryUrlOptions,
 } from "./types";
+import { toSafeCause } from "@/core/safe-error";
 
 type ServiceLogger = {
   info?: (obj: object, msg?: string) => void;
@@ -78,10 +79,10 @@ export class CloudinaryService {
       });
       return this.normalizeUpload(raw);
     } catch (err) {
-      this.log?.error?.({ err, folder }, "Cloudinary uploadBuffer failed");
+      this.log?.error?.({ err: toSafeCause(err), folder }, "Cloudinary uploadBuffer failed");
       throw new CloudinaryUploadError(
         err instanceof Error ? err.message : "Cloudinary upload failed",
-        err,
+        toSafeCause(err),
       );
     }
   }
@@ -105,10 +106,10 @@ export class CloudinaryService {
       >;
       return this.normalizeUpload(raw);
     } catch (err) {
-      this.log?.error?.({ err, folder, filePath }, "Cloudinary uploadPath failed");
+      this.log?.error?.({ err: toSafeCause(err), folder, filePath }, "Cloudinary uploadPath failed");
       throw new CloudinaryUploadError(
         err instanceof Error ? err.message : "Cloudinary upload failed",
-        err,
+        toSafeCause(err),
       );
     }
   }
@@ -140,10 +141,10 @@ export class CloudinaryService {
       >;
       return this.normalizeUpload(raw);
     } catch (err) {
-      this.log?.error?.({ err, folder }, "Cloudinary uploadBase64 failed");
+      this.log?.error?.({ err: toSafeCause(err), folder }, "Cloudinary uploadBase64 failed");
       throw new CloudinaryUploadError(
         err instanceof Error ? err.message : "Cloudinary upload failed",
-        err,
+        toSafeCause(err),
       );
     }
   }
@@ -171,10 +172,10 @@ export class CloudinaryService {
         raw,
       };
     } catch (err) {
-      this.log?.error?.({ err, publicId }, "Cloudinary delete failed");
+      this.log?.error?.({ err: toSafeCause(err), publicId }, "Cloudinary delete failed");
       throw new CloudinaryDeleteError(
         err instanceof Error ? err.message : "Cloudinary delete failed",
-        err,
+        toSafeCause(err),
       );
     }
   }
@@ -229,12 +230,12 @@ export class CloudinaryService {
       return this.normalizeUpload(raw);
     } catch (err) {
       this.log?.error?.(
-        { err, fromPublicId, toPublicId },
+        { err: toSafeCause(err), fromPublicId, toPublicId },
         "Cloudinary rename failed",
       );
       throw new CloudinaryRenameError(
         err instanceof Error ? err.message : "Cloudinary rename failed",
-        err,
+        toSafeCause(err),
       );
     }
   }

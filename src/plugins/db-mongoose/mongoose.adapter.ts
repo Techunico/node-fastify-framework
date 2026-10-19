@@ -1,11 +1,6 @@
 import mongoose from "mongoose";
 
-export interface DatabaseAdapter {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  getClient(): unknown;
-  isConnected?(): boolean;
-}
+import type { DatabaseAdapter } from "@/core/interfaces/database";
 
 type AdapterLogger = {
   info: (obj: object | string, msg?: string) => void;
@@ -18,9 +13,12 @@ type AdapterLogger = {
  * Single shared Mongoose connection for the process.
  * Uses mongoose's default connection (not createConnection) so models share one pool.
  */
-export class MongooseAdapter implements DatabaseAdapter {
+export class MongooseAdapter implements DatabaseAdapter<typeof mongoose> {
+  readonly provider = "mongodb" as const;
   private listenersAttached = false;
   private logger: AdapterLogger | null = null;
+
+  constructor(private readonly uri: string) {}
 
   setLogger(logger: AdapterLogger) {
     this.logger = logger;
@@ -97,7 +95,7 @@ export class MongooseAdapter implements DatabaseAdapter {
   }
 
   async connect() {
-    if (!process.env.MONGO_URI) {
+    if (!this.uri) {
       throw new Error("MONGO_URI is not defined");
     }
 
@@ -136,11 +134,11 @@ export class MongooseAdapter implements DatabaseAdapter {
 
     this.log(
       "info",
-      { uriHost: redactUri(process.env.MONGO_URI) },
+      { uriHost: redactUri(this.uri) },
       "Connecting to MongoDB…",
     );
 
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(this.uri, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       // Single default connection pool (do not call createConnection elsewhere)
@@ -178,6 +176,14 @@ export class MongooseAdapter implements DatabaseAdapter {
 
   isConnected(): boolean {
     return mongoose.connection.readyState === 1;
+  }
+
+  async ping(): Promise<void> {
+    const db = mongoose.connection.db;
+    if (mongoose.connection.readyState !== 1 || !db) {
+      throw new Error("MongoDB is not connected");
+    }
+    await db.admin().ping();
   }
 }
 

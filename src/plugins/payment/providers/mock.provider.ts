@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { PaymentGatewayAdapter } from "../adapter";
 import {
   PaymentInvalidSignatureError,
@@ -41,7 +41,15 @@ export class MockPaymentGatewayAdapter implements PaymentGatewayAdapter {
   private readonly refunds = new Map<string, PaymentRefundResult>();
   private seq = 0;
 
-  constructor(private readonly config: MockGatewayConfig) {}
+  /**
+   * Per-instance HMAC key. Mock signatures are only valid for the process that
+   * created them and can be produced with `signForTesting()`.
+   */
+  private readonly signingSecret: string;
+
+  constructor(private readonly config: MockGatewayConfig) {
+    this.signingSecret = config.signingSecret || randomBytes(32).toString("hex");
+  }
 
   async authorizePayment(
     context: PaymentContext,
@@ -195,10 +203,16 @@ export class MockPaymentGatewayAdapter implements PaymentGatewayAdapter {
   async verifySignature(
     input: PaymentSignatureInput,
   ): Promise<PaymentSignatureResult> {
-    const expected = this.sign(input.payload);
+    const expected = Buffer.from(this.sign(input.payload));
+    const received = Buffer.from(String(input.signature ?? ""));
     const valid =
-      input.signature === expected || input.signature === "mock-valid";
+      expected.length === received.length && timingSafeEqual(expected, received);
     return { valid, provider: this.name };
+  }
+
+  /** Produces a signature this mock gateway accepts. For tests and local development only. */
+  signForTesting(payload: string): string {
+    return this.sign(payload);
   }
 
   async parseWebhook(input: ParseWebhookInput): Promise<ParsedWebhookPayload> {
@@ -292,7 +306,7 @@ export class MockPaymentGatewayAdapter implements PaymentGatewayAdapter {
   }
 
   private sign(payload: string): string {
-    return createHash("sha256").update(`mock|${payload}`).digest("hex");
+    return createHmac("sha256", this.signingSecret).update(payload).digest("hex");
   }
 
   private mergeMetadata(context: PaymentContext): PaymentMetadata {

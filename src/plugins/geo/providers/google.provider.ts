@@ -10,6 +10,7 @@ import {
   SnapToRoadInput, SnapToRoadResult, SpeedLimitInput, SpeedLimitResult, TimezoneInput,
   TimezoneResult, TravelMode,
 } from "../types";
+import { toSafeCause } from "@/core/safe-error";
 
 interface GoogleLatLng { lat: number; lng: number; }
 interface GoogleApiLatLng { latitude: number; longitude: number; }
@@ -398,7 +399,7 @@ export class GoogleGeoProvider implements GeoAdapter {
 
   private url(baseUrl: string, endpoint: string): string {
     try { return new URL(endpoint, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString(); }
-    catch (error: unknown) { throw new GeoError("Invalid Google base URL or endpoint configuration", undefined, error); }
+    catch (error: unknown) { throw new GeoError("Invalid Google base URL or endpoint configuration", undefined, toSafeCause(error)); }
   }
 
   private static placeDetailsEndpoint(placeId: string): string {

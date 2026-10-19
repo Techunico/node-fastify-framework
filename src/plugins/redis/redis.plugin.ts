@@ -5,7 +5,8 @@ import { config } from "@/config";
 
 declare module 'fastify' {
   interface FastifyInstance {
-    redis: Redis;
+    /** Present when PLUGINS includes redis. */
+    redis?: Redis;
   }
 }
 
@@ -26,7 +27,12 @@ export default fp(async (app: FastifyInstance) => {
 
   app.decorate('redis', redis);
 
+  app.readiness.add('redis', async () => {
+    const pong = await redis.ping();
+    if (pong !== 'PONG') throw new Error('Unexpected ping response');
+  });
+
   app.addHook('onClose', async () => {
     await redis.quit();
   });
-});
+}, { name: 'redis' });

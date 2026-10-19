@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment — contains secrets (JWT keys, database URLs, API keys)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Generated Prisma client
+src/generated/
+
+# Logs, coverage, OS files
+*.log
+coverage/
+.DS_Store

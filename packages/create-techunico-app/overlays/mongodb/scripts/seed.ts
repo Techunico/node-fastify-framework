@@ -2,24 +2,31 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { Permission, Role } from "../src/models/rbac.model";
 
+const PERMISSIONS = ["user.read", "user.create", "user.update", "user.delete"];
+
+// Idempotent: safe to run repeatedly.
 async function main() {
-  await mongoose.connect(process.env.MONGO_URI!);
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    throw new Error("MONGO_URI is not set");
+  }
 
-  const permissions = await Permission.insertMany([
-    { name: "user.read" },
-    { name: "user.create" },
-    { name: "user.update" },
-    { name: "user.delete" },
-  ]);
+  await mongoose.connect(uri);
+  await Promise.all([Permission.init(), Role.init()]);
 
-  await Role.create({
-    name: "admin",
-    permissions: permissions.map((permission) => permission._id),
-  });
+  for (const name of PERMISSIONS) {
+    await Permission.updateOne({ name }, { $setOnInsert: { name } }, { upsert: true });
+  }
 
-  await Role.create({
-    name: "user",
-  });
+  const permissions = await Permission.find({ name: { $in: PERMISSIONS } }).select("_id");
+
+  await Role.updateOne(
+    { name: "admin" },
+    { $set: { permissions: permissions.map((permission) => permission._id) } },
+    { upsert: true },
+  );
+
+  await Role.updateOne({ name: "user" }, { $setOnInsert: { name: "user" } }, { upsert: true });
 }
 
 main()
@@ -27,7 +34,7 @@ main()
     await mongoose.disconnect();
   })
   .catch(async (error) => {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : error);
     await mongoose.disconnect();
     process.exit(1);
   });

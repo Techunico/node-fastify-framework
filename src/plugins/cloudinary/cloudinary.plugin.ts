@@ -17,7 +17,12 @@ export interface CloudinaryPluginOptions {
   requireConfigured?: boolean;
 }
 
-// FastifyInstance.cloudinary is declared optionally in src/types/fastify.d.ts
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Present when PLUGINS includes cloudinary. */
+    cloudinary?: CloudinaryService;
+  }
+}
 
 const registerCloudinary: FastifyPluginAsync<CloudinaryPluginOptions> = async (
   app: FastifyInstance,

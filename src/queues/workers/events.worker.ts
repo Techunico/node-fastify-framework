@@ -1,13 +1,15 @@
+// Standalone worker process: load .env before configuration is read.
+import 'dotenv/config';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { loadConfig } from '../../bootstrap/config';
-
-const config = loadConfig();
+import { config } from '../../config';
 
 const connection = new Redis({
-  host: config.REDIS_HOST,
-  port: config.REDIS_PORT,
-  password: config.REDIS_PASSWORD,
+  host: config.redis.host,
+  port: config.redis.port,
+  password: config.redis.password,
+  // Required by BullMQ workers (blocking commands).
+  maxRetriesPerRequest: null,
 });
 
 new Worker(

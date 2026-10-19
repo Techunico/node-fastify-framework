@@ -10,7 +10,12 @@ import { GeoPluginConfig, GeoProviderName } from "./types";
 
 export interface GeoPluginOptions { config?: GeoPluginConfig; }
 
-// FastifyInstance.geo is declared optionally in src/types/fastify.d.ts
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Present when PLUGINS includes geo. */
+    geo?: GeoService;
+  }
+}
 
 const createProvider = (name: GeoProviderName, config: GeoPluginConfig): GeoAdapter => {
   switch (name) {
