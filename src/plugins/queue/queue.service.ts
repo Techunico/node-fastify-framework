@@ -36,4 +36,10 @@ export class QueueService {
       removeOnComplete: options?.removeOnComplete ?? true,
     });
   }
+
+  /** Closes every queue opened by this service. The shared Redis connection is closed by the redis plugin. */
+  async close() {
+    await Promise.all([...this.queues.values()].map((queue) => queue.close()));
+    this.queues.clear();
+  }
 }

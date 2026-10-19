@@ -7,6 +7,15 @@ export enum CloudinaryErrorCode {
   InvalidInput = "CLOUDINARY_INVALID_INPUT",
 }
 
+const STATUS_BY_CODE: Record<CloudinaryErrorCode, number> = {
+  [CloudinaryErrorCode.Cloudinary]: 500,
+  [CloudinaryErrorCode.NotConfigured]: 503,
+  [CloudinaryErrorCode.UploadFailed]: 502,
+  [CloudinaryErrorCode.DeleteFailed]: 502,
+  [CloudinaryErrorCode.RenameFailed]: 502,
+  [CloudinaryErrorCode.InvalidInput]: 400,
+};
+
 export class CloudinaryError extends Error {
   constructor(
     message: string,
@@ -15,6 +24,11 @@ export class CloudinaryError extends Error {
   ) {
     super(message);
     this.name = new.target.name;
+  }
+
+  /** HTTP status used by the framework error handler. 4xx messages are shown to clients. */
+  get statusCode(): number {
+    return STATUS_BY_CODE[this.code] ?? 500;
   }
 }
 

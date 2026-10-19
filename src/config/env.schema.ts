@@ -36,6 +36,11 @@ export function isWeakSecret(value: string): boolean {
   return new Set(normalized).size < 8;
 }
 
+const booleanString = (fallback: "true" | "false") =>
+  z
+    .preprocess(blankToUndefined, z.enum(["true", "false"]).default(fallback))
+    .transform((value) => value === "true");
+
 export const secret = (name: string) =>
   z
     .string({ error: `${name} is required` })
@@ -66,6 +71,28 @@ const baseSchema = z.object({
   JWT_AUDIENCE: z.string().min(1).default("techunico-api"),
   JWT_ACCESS_TTL: z.string().min(1).default("15m"),
   JWT_REFRESH_TTL: z.string().min(1).default("30d"),
+
+  // ─── HTTP hardening ──────────────────────────────────────────────────────
+  /** false | true | <hop count> | comma-separated proxy IPs/CIDRs */
+  TRUST_PROXY: z.string().default("false"),
+  /** Comma-separated allowed origins. Unset: no CORS in production, any origin in development. */
+  CORS_ORIGINS: optional(z.string()),
+  CORS_CREDENTIALS: booleanString("false"),
+  RATE_LIMIT_ENABLED: booleanString("true"),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_WINDOW: z.string().min(1).default("1 minute"),
+  /** Stricter limit for /auth/login and /auth/register (per client IP). */
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  AUTH_RATE_LIMIT_WINDOW: z.string().min(1).default("1 minute"),
+
+  // ─── Metrics ─────────────────────────────────────────────────────────────
+  METRICS_ENABLED: booleanString("true"),
+  /** Bearer token required to read /metrics. Required in production unless METRICS_PUBLIC=true. */
+  METRICS_TOKEN: optional(z.string().min(16, "METRICS_TOKEN must be at least 16 characters")),
+  METRICS_PUBLIC: booleanString("false"),
+
+  // ─── Lifecycle ───────────────────────────────────────────────────────────
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 });
 
 const databaseSchema = z.discriminatedUnion("DB_PROVIDER", [

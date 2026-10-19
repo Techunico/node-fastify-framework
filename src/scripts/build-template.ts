@@ -2,7 +2,7 @@
  * Builds packages/create-techunico-app/template from the framework source.
  *
  *   src/ (minus tooling, experimental code, generated client)  → template/src
- *   tsconfig.json, .env.example                                 → template/
+ *   tsconfig*.json, jest.config.js, .env.example                → template/
  *   packages/create-techunico-app/scaffold/*                    → template/  (app-owned files)
  *   prisma/{schema.postgresql.prisma,seed.ts,starter/…}         → assets/prisma
  *
@@ -63,7 +63,9 @@ function main() {
   fs.mkdirSync(templateRoot, { recursive: true });
 
   copySource();
-  copyFile(fromRepo("tsconfig.json"), path.join(templateRoot, "tsconfig.json"));
+  for (const file of ["tsconfig.json", "tsconfig.build.json", "tsconfig.test.json", "jest.config.js"]) {
+    copyFile(fromRepo(file), path.join(templateRoot, file));
+  }
   copyFile(fromRepo(".env.example"), path.join(templateRoot, ".env.example"));
 
   for (const entry of fs.readdirSync(scaffoldRoot)) {

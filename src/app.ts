@@ -16,6 +16,8 @@ export interface BuildAppOptions extends RegisterPluginsOptions {
 export async function buildApp(options: BuildAppOptions) {
   const app = Fastify({
     logger: options.logger ?? buildLoggerOptions(options.config),
+    // Explicit: only trust X-Forwarded-* from configured proxies (TRUST_PROXY).
+    trustProxy: options.config.http.trustProxy,
   });
 
   app.decorate("config", options.config);

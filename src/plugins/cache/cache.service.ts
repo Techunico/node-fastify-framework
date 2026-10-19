@@ -50,10 +50,20 @@ export class CacheService {
     return fresh;
   }
 
-  async flush(pattern: string) {
-    const keys = await this.redis.keys(pattern);
-    if (keys.length) {
-      await this.redis.del(...keys);
-    }
+  /**
+   * Deletes keys matching `pattern` using incremental SCAN (non-blocking,
+   * unlike KEYS). Returns the number of keys removed.
+   */
+  async flush(pattern: string, batchSize = 500): Promise<number> {
+    let cursor = '0';
+    let removed = 0;
+    do {
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', batchSize);
+      cursor = next;
+      if (keys.length) {
+        removed += await this.redis.unlink(...keys);
+      }
+    } while (cursor !== '0');
+    return removed;
   }
 }

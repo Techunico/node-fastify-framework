@@ -254,9 +254,12 @@ async function startApp(c, appDir, env) {
   }
 
   const port = await freePort();
-  const args = useBuild ? ["run", "start"] : null;
+  if (useBuild && !assert(c.id, "start script runs compiled output", pkg.scripts.start === "node dist/server.js", pkg.scripts.start)) {
+    return null;
+  }
+  // Spawn node directly (same command as `npm start`) so signals reach the app process.
   const child = useBuild
-    ? spawn("npm", args, { cwd: appDir, env: cleanEnv({ ...env, PORT: String(port) }), stdio: ["ignore", "pipe", "pipe"] })
+    ? spawn(process.execPath, ["dist/server.js"], { cwd: appDir, env: cleanEnv({ ...env, PORT: String(port) }), stdio: ["ignore", "pipe", "pipe"] })
     : spawn(
         process.execPath,
         ["-r", "ts-node/register/transpile-only", "-r", "tsconfig-paths/register", "src/server.ts"],
@@ -289,7 +292,7 @@ async function stopApp(c, server) {
     assert(c.id, "stops within 15s of SIGTERM", false, "process had to be killed");
     return;
   }
-  record(c.id, "stops within 15s of SIGTERM", "pass", `exit ${outcome.code ?? outcome.signal}`);
+  assert(c.id, "graceful shutdown on SIGTERM (exit 0)", outcome.code === 0, `exit ${outcome.code ?? outcome.signal}\n${tail(server.getOutput(), 10)}`);
 }
 
 async function checkApp(c, appDir, infra, secrets) {
@@ -356,6 +359,7 @@ async function checkApp(c, appDir, infra, secrets) {
     CLOUDINARY_CLOUD_NAME: "smoke-cloud",
     CLOUDINARY_API_KEY: "smoke-key",
     CLOUDINARY_API_SECRET: "smoke-secret",
+    METRICS_TOKEN: "smoke-metrics-token-0123456789",
     PAYMENT_PROVIDER: "razorpay",
     RAZORPAY_KEY_ID: "rzp_test_SmokeKey123",
     RAZORPAY_KEY_SECRET: "smoke-razorpay-secret-value",
@@ -380,6 +384,14 @@ async function checkApp(c, appDir, infra, secrets) {
     if (redisNeeded) {
       assert(c.id, "readiness includes redis", ready.json?.data?.checks?.redis?.status === "ok", JSON.stringify(ready.json));
     }
+
+    const metricsDenied = await fetch(`${server.base}/metrics`);
+    const metricsAllowed = await fetch(`${server.base}/metrics`, { headers: { authorization: `Bearer ${runtimeEnv.METRICS_TOKEN}` } });
+    assert(c.id, "/metrics requires the token in production", metricsDenied.status === 401 && metricsAllowed.status === 200,
+      `${metricsDenied.status}/${metricsAllowed.status}`);
+
+    const health = await fetch(`${server.base}/health`);
+    assert(c.id, "security headers present", health.headers.get("x-content-type-options") === "nosniff", "missing nosniff");
 
     const email = `smoke-${randomBytes(4).toString("hex")}@example.com`;
     const register = await http(server.base, "POST", "/api/v1/auth/register", { body: { name: "Smoke", email, password: "correct-horse-battery" } });

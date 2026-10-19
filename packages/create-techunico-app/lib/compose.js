@@ -132,6 +132,8 @@ function buildPackageJson(basePackage, manifest, { name, db, plugins }) {
 
   const scripts = { ...basePackage.scripts };
   if (db === "postgresql") {
+    // The generated Prisma client is JavaScript, so tsc does not emit it.
+    scripts.build = `${scripts.build} && node -e "require('fs').cpSync('src/generated','dist/generated',{recursive:true})"`;
     Object.assign(scripts, {
       generate: "prisma generate",
       migrate: "prisma migrate dev",

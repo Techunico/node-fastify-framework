@@ -151,3 +151,27 @@ describe("generated project", () => {
     expect(fs.existsSync(path.join(workDir, "..", "evil"))).toBe(false);
   });
 });
+
+describe("generated project type-checks without optional plugins (fast, offline)", () => {
+  // Uses the framework's node_modules, so it cannot detect missing packages
+  // (the packaging smoke test does); it does detect core code that depends on
+  // optional plugins' files or decorator types.
+  it.each(["postgresql", "mongodb"])("%s", (db) => {
+    const name = `tsc-${db}`;
+    const { target } = generate(name, db, []);
+    fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(target, "node_modules"), "dir");
+    if (db === "postgresql") {
+      fs.cpSync(path.join(repoRoot, "src/generated"), path.join(target, "src/generated"), { recursive: true });
+    }
+
+    const tsc = path.join(repoRoot, "node_modules/typescript/bin/tsc");
+    for (const project of ["tsconfig.json", "tsconfig.test.json"]) {
+      try {
+        execFileSync(process.execPath, [tsc, "--noEmit", "-p", project], { cwd: target, stdio: "pipe" });
+      } catch (error) {
+        const output = String((error as { stdout?: Buffer }).stdout ?? error);
+        throw new Error(`${db} ${project} failed:\n${output.slice(0, 2000)}`);
+      }
+    }
+  }, 120_000);
+});

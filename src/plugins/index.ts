@@ -8,6 +8,7 @@ import contextPlugin from "./context.plugin";
 import servicesPlugin from "./services.plugin";
 import jwtPlugin from "./jwt.plugin";
 import metricsPlugin from "./metrics.plugin";
+import securityPlugin from "./security.plugin";
 
 import databasePlugin, { databaseProvider } from "./database";
 import { ReadinessRegistry } from "@/core/readiness";
@@ -108,4 +109,7 @@ export async function registerPlugins(app: FastifyInstance, options: RegisterPlu
     const pluginConfig = plugin.loadConfig?.(config.source);
     await app.register(plugin.default, pluginConfig === undefined ? {} : { config: pluginConfig });
   }
+
+  // 🛡️ HTTP safeguards last, so they can use optional plugins (redis store).
+  await app.register(securityPlugin);
 }

@@ -53,12 +53,13 @@ Defects found while adding Phase 2 tests (fixed):
 - Login on an unknown email skipped bcrypt (timing difference); now compares against a dummy hash.
 
 ## Phase 3 — production hardening
-- [ ] F-12 graceful shutdown (signals, timeout, BullMQ close, startup errors)
-- [ ] F-11 metrics cardinality, METRICS_ENABLED, protected endpoint
-- [ ] F-18 helmet / cors / rate-limit / trustProxy
-- [ ] F-15 build / start / typecheck / test scripts in generated apps
-- [ ] F-21 framework error contract; Geo/Cloudinary/Payment mapped to safe HTTP
-- [ ] F-26 Redis readiness, bounded retries, SCAN
+- [x] F-12 graceful shutdown: `src/core/lifecycle.ts` (SIGTERM/SIGINT → `app.close()` → exit 0; timeout `SHUTDOWN_TIMEOUT_MS` → exit 1; second signal forces exit; fatal errors close + exit 1); BullMQ queues closed before Redis (onClose runs in reverse registration order — verified); startup failure closes opened resources
+- [x] F-11 metrics: route pattern labels only (`__unmatched__` otherwise), `METRICS_ENABLED`, `METRICS_TOKEN` bearer protection, required in production unless `METRICS_PUBLIC=true`; metrics only on the framework registry
+- [x] F-18 HTTP safeguards: `@fastify/helmet`, `@fastify/cors` (explicit allowlist; `*` rejected in production; none by default outside development), `@fastify/rate-limit` (global + stricter `/auth/login|register`, Redis store when the redis plugin is enabled, probes exempt, standard envelope + `retry-after`), explicit `TRUST_PROXY`
+- [x] F-15 build/start/typecheck/test scripts for generated apps and the framework (`tsc` + `tsc-alias`; PostgreSQL copies the generated Prisma client); sample app test with a stub database
+- [x] F-21 error contract: plugin errors carry `statusCode` (Geo/Cloudinary/Payment code→status maps); 4xx messages shown, 5xx generic in production; envelope for 404 without echoing the URL
+- [x] F-26 Redis: lazy connect with timeout (clear startup error), bounded `maxRetriesPerRequest`, capped reconnect backoff, throttled error logs, readiness timeout; cache `flush` uses SCAN + UNLINK
+- [x] F-08 verified end-to-end: framework repo builds, seeds, serves `/ready`, registers a user against an isolated PostgreSQL, exits 0 on SIGTERM
 
 ## Phase 4 — maintainability & cleanup
 - [ ] F-20 request id propagation
