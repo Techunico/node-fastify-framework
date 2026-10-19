@@ -1,13 +1,9 @@
 import { Schema } from "mongoose";
 import { registerModel } from "@/plugins/db-mongoose/register-model";
 
-const {{camelName}}Schema = new Schema(
-  {
-    name: { type: String },
-  },
-  {
-    timestamps: true,
-  },
-);
+const {{camelName}}Schema = new Schema({
+  name: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
 
 export const {{pascalName}} = registerModel("{{pascalName}}", {{camelName}}Schema);

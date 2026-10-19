@@ -1,0 +1,17 @@
+import type { AppDatabase } from "@/plugins/database";
+import type { {{pascalName}}Record, {{pascalName}}RepositoryContract } from "./{{name}}.types";
+
+/** PostgreSQL (Prisma). Uses the `{{pascalName}}` model in prisma/schema.prisma. */
+export class {{pascalName}}Repository implements {{pascalName}}RepositoryContract {
+  constructor(private readonly db: AppDatabase) {}
+
+  async findAll(): Promise<{{pascalName}}Record[]> {
+    const rows = await this.db.getClient().{{camelName}}.findMany({ orderBy: { createdAt: "desc" } });
+    return rows.map((row) => ({ ...row, id: String(row.id) }));
+  }
+
+  async create(data: { name: string }): Promise<{{pascalName}}Record> {
+    const row = await this.db.getClient().{{camelName}}.create({ data });
+    return { ...row, id: String(row.id) };
+  }
+}

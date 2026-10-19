@@ -169,3 +169,23 @@ describe("TRUST_PROXY hop count", () => {
     await app.close();
   });
 });
+
+describe("request IDs", () => {
+  it("echoes a well-formed incoming x-request-id and uses it in logs", async () => {
+    const { app, logs } = await buildTestApp();
+    const res = await app.inject({ method: "GET", url: "/health", headers: { "x-request-id": "req-abc.123" } });
+    expect(res.headers["x-request-id"]).toBe("req-abc.123");
+    expect(logs.text()).toContain('"requestId":"req-abc.123"');
+    await app.close();
+  });
+
+  it("replaces malformed or oversized incoming IDs", async () => {
+    const { app } = await buildTestApp();
+    for (const bad of ["has spaces", "x".repeat(200), "line\\nbreak", "<script>"]) {
+      const res = await app.inject({ method: "GET", url: "/health", headers: { "x-request-id": bad } });
+      expect(res.headers["x-request-id"]).not.toBe(bad);
+      expect(res.headers["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
+    }
+    await app.close();
+  });
+});

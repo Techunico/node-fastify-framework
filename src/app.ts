@@ -1,3 +1,5 @@
+import { randomUUID } from "crypto";
+import { IncomingMessage } from "http";
 import Fastify, { FastifyServerOptions } from "fastify";
 import { setupPlugins } from "./core/register-plugins";
 import { setupErrorHandler } from "./core/error-handler";
@@ -13,11 +15,23 @@ export interface BuildAppOptions extends RegisterPluginsOptions {
   logger?: FastifyServerOptions["logger"];
 }
 
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/** Accepts only short, log-safe incoming request IDs. */
+export function requestIdFrom(request: IncomingMessage): string {
+  const header = request.headers["x-request-id"];
+  return typeof header === "string" && REQUEST_ID_PATTERN.test(header) ? header : randomUUID();
+}
+
 export async function buildApp(options: BuildAppOptions) {
   const app = Fastify({
     logger: options.logger ?? buildLoggerOptions(options.config),
     // Explicit: only trust X-Forwarded-* from configured proxies (TRUST_PROXY).
     trustProxy: options.config.http.trustProxy,
+    // Request IDs: reuse a well-formed incoming x-request-id, otherwise generate one.
+    requestIdHeader: false,
+    requestIdLogLabel: "requestId",
+    genReqId: requestIdFrom,
   });
 
   app.decorate("config", options.config);

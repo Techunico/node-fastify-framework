@@ -175,3 +175,51 @@ describe("generated project type-checks without optional plugins (fast, offline)
     }
   }, 120_000);
 });
+
+describe("make:module generator", () => {
+  const tsNode = path.join(repoRoot, "node_modules/ts-node/dist/bin.js");
+  const makeModule = (cwd: string, name: string) =>
+    execFileSync(process.execPath, [tsNode, "-r", "tsconfig-paths/register", "src/scripts/make-module.ts", name], {
+      cwd,
+      stdio: "pipe",
+      env: { ...process.env, TS_NODE_TRANSPILE_ONLY: "1" },
+    }).toString();
+
+  function appWithModules(name: string, db: string) {
+    const { target } = generate(name, db, []);
+    fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(target, "node_modules"), "dir");
+    return target;
+  }
+
+  it("creates a type-correct kebab-case module in a MongoDB app", () => {
+    const target = appWithModules("mm-mongo", "mongodb");
+    expect(makeModule(target, "order-items")).toContain('Module "order-items" created');
+
+    const dir = path.join(target, "src/modules/order-items");
+    expect(fs.readFileSync(path.join(dir, "index.ts"), "utf-8")).toContain("export async function orderItemsModule");
+    expect(fs.existsSync(path.join(dir, "order-items.model.ts"))).toBe(true);
+
+    const tsc = path.join(repoRoot, "node_modules/typescript/bin/tsc");
+    try {
+      execFileSync(process.execPath, [tsc, "--noEmit", "-p", "tsconfig.json"], { cwd: target, stdio: "pipe" });
+    } catch (error) {
+      throw new Error(String((error as { stdout?: Buffer }).stdout ?? error).slice(0, 2000));
+    }
+  }, 120_000);
+
+  it("adds the Prisma model in a PostgreSQL app and refuses duplicates", () => {
+    const target = appWithModules("mm-pg", "postgresql");
+    const output = makeModule(target, "invoice");
+    expect(output).toContain("Added model Invoice to prisma/schema.prisma");
+    expect(fs.readFileSync(path.join(target, "prisma/schema.prisma"), "utf-8")).toMatch(/^model Invoice \{/m);
+    expect(fs.readFileSync(path.join(target, "src/modules/invoice/invoice.repository.ts"), "utf-8")).toContain(
+      "this.db.getClient().invoice",
+    );
+    expect(() => makeModule(target, "invoice")).toThrow();
+  }, 120_000);
+
+  it.each(["Order", "order_items", "order--items", "../escape", "auth"])("rejects module name %p", (name) => {
+    const target = path.join(workDir, "mm-mongo");
+    expect(() => makeModule(target, name)).toThrow();
+  });
+});

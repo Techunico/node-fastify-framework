@@ -16,9 +16,21 @@ const value = (env: EnvSource, name: string): string => env[name]?.trim() ?? "";
 const provider = (env: EnvSource, name: string, required: boolean): GeoProviderName | undefined => {
   const raw = value(env, name).toLowerCase();
   if (!raw && !required) return undefined;
-  if (raw === GeoProviderName.Google || raw === GeoProviderName.TomTom) return raw;
+  if (raw === GeoProviderName.Google) return raw;
+  if (raw === GeoProviderName.TomTom) {
+    // The TomTom adapter is a placeholder that rejects every operation.
+    throw new GeoError(`${name}=tomtom is not supported yet (the TomTom provider is not implemented); use google`);
+  }
   throw new GeoError(`${name} must be one of: google, tomtom`);
 };
+
+/** Official Google Maps Platform hosts; override only for proxies or testing. */
+export const GOOGLE_DEFAULT_BASE_URLS = {
+  maps: "https://maps.googleapis.com",
+  routes: "https://routes.googleapis.com",
+  places: "https://places.googleapis.com",
+  roads: "https://roads.googleapis.com",
+} as const;
 
 /** Reads provider credentials, base URLs, HTTP settings, and cache settings. */
 export function loadGeoConfig(env: EnvSource): GeoPluginConfig {
@@ -27,10 +39,10 @@ export function loadGeoConfig(env: EnvSource): GeoPluginConfig {
     fallbackProvider: provider(env, "GEO_FALLBACK_PROVIDER", false),
     google: {
       apiKey: value(env, "GOOGLE_MAPS_API_KEY"),
-      mapsBaseUrl: value(env, "GOOGLE_MAPS_BASE_URL"),
-      routesBaseUrl: value(env, "GOOGLE_ROUTES_BASE_URL"),
-      placesBaseUrl: value(env, "GOOGLE_PLACES_BASE_URL"),
-      roadsBaseUrl: value(env, "GOOGLE_ROADS_BASE_URL"),
+      mapsBaseUrl: value(env, "GOOGLE_MAPS_BASE_URL") || GOOGLE_DEFAULT_BASE_URLS.maps,
+      routesBaseUrl: value(env, "GOOGLE_ROUTES_BASE_URL") || GOOGLE_DEFAULT_BASE_URLS.routes,
+      placesBaseUrl: value(env, "GOOGLE_PLACES_BASE_URL") || GOOGLE_DEFAULT_BASE_URLS.places,
+      roadsBaseUrl: value(env, "GOOGLE_ROADS_BASE_URL") || GOOGLE_DEFAULT_BASE_URLS.roads,
       timeoutMs: integer(env, "GEO_REQUEST_TIMEOUT_MS", 5_000),
       retries: integer(env, "GEO_REQUEST_RETRIES", 2),
       retryDelayMs: integer(env, "GEO_RETRY_DELAY_MS", 200),

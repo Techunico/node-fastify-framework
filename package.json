@@ -17,10 +17,7 @@
     "version:minor": "npm version minor",
     "version:major": "npm version major",
     "migrate:pg": "prisma migrate dev --schema=prisma/schema.postgresql.prisma",
-    "migrate:sqlite": "prisma migrate dev --schema=prisma/schema.sqlite.prisma",
-    "generate:pg": "prisma generate --schema=prisma/schema.postgresql.prisma",
-    "generate:sqlite": "prisma generate --schema=prisma/schema.sqlite.prisma",
-    "plugin:add": "tsx src/scripts/add-plugin.ts"
+    "generate:pg": "prisma generate --schema=prisma/schema.postgresql.prisma"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -33,7 +30,6 @@
     "@fastify/cors": "^11.3.1",
     "@fastify/helmet": "^13.2.0",
     "@fastify/rate-limit": "^10.3.0",
-    "@prisma/adapter-better-sqlite3": "^7.7.0",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "axios": "^1.19.0",
@@ -70,7 +66,6 @@
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsc-alias": "^1.9.8",
-    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   },
   "private": true

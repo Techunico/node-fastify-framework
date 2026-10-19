@@ -1,20 +1,14 @@
-export class {{name}}Service {
-  constructor(private db: any) {}
+import type { Create{{pascalName}}Input } from "./{{name}}.schema";
+import type { {{pascalName}}RepositoryContract } from "./{{name}}.types";
 
-  async findAll() {
-    const client = this.db.getClient()
+export class {{pascalName}}Service {
+  constructor(private readonly repo: {{pascalName}}RepositoryContract) {}
 
-    // Prisma fallback
-    if (client.{{camelName}}?.findMany) {
-      return client.{{camelName}}.findMany()
-    }
+  findAll() {
+    return this.repo.findAll();
+  }
 
-    // Mongo fallback
-    if (client.model) {
-      const Model = client.model('{{pascalName}}')
-      return Model.find()
-    }
-
-    return []
+  create(data: Create{{pascalName}}Input) {
+    return this.repo.create(data);
   }
 }

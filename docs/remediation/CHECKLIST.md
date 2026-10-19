@@ -62,14 +62,24 @@ Defects found while adding Phase 2 tests (fixed):
 - [x] F-08 verified end-to-end: framework repo builds, seeds, serves `/ready`, registers a user against an isolated PostgreSQL, exits 0 on SIGTERM
 
 ## Phase 4 — maintainability & cleanup
-- [ ] F-20 request id propagation
-- [ ] F-22/F-23 module loader naming + generator correctness
-- [ ] F-27 geo defaults
-- [ ] F-28 CLI robustness (remaining)
-- [ ] F-29 BaseRepository placement
-- [ ] F-24 dead/experimental code boundary (documented)
-- [ ] SQLite removed from runtime/advertised config
-- [ ] F-30 hygiene, F-31 docs
-- [-] F-32 Fastify-native schema provider (optional)
-- [ ] Runtime-package recommendation
-- [ ] Migration advisory for existing generated apps
+- [x] F-20 request IDs: well-formed incoming `x-request-id` reused (else UUID), echoed in responses, single `requestId` log label
+- [x] F-22 module loader: `default` or camel-cased `<name>Module` export; missing export fails loudly; deterministic order
+- [x] F-23 `make:module`: kebab-case validation, valid identifiers, DB from `src/plugins/database.ts`, typed repository contract, Prisma model appended / Mongoose model registered (tested in generated apps)
+- [x] F-27 geo: official Google base URLs by default; `tomtom` rejected until implemented
+- [x] F-28 CLI robustness (name validation, flags, failure cleanup — Phase 1); `--help`
+- [x] F-29 `BaseRepository` (Prisma-only) moved to `src/plugins/db-prisma/`
+- [x] F-24 dead code: removed after reference checks — `core/register-modules.ts`, `utils/validate.ts`, `events/event.loader.ts` + `utils/file-loader.ts`, unused health controller/service, empty schemas, fake `plugins/*/package.json`, `scripts/add-plugin.ts` (+ `plugin:add`, `tsx`); events plugin now registers `src/events/event.registry.ts` listeners (previously never called); experimental code isolated in `src/experimental/` (README)
+- [x] SQLite removed: `DB_PROVIDER=sqlite` rejected; SQLite schema, SQLite-only migration, duplicate `prisma/schema.prisma`, scripts and `@prisma/adapter-better-sqlite3` removed; root `prisma.config.ts` PostgreSQL-only; `dev.db` untracked (file kept locally) and `*.db` ignored
+- [x] F-30 hygiene: `src/modules/.DS_Store` untracked, `.DS_Store` / `dist/` ignored, root `package.json` metadata fixed
+- [x] F-31 docs: root README, CLI README, generated-app README, CLI CHANGELOG
+- [-] F-32 Fastify-native schema provider — deferred (optional; no behaviour problem)
+- [x] Runtime-package recommendation: `docs/remediation/RUNTIME-PACKAGE-RECOMMENDATION.md`
+- [x] Migration advisory: `docs/remediation/SECURITY-ADVISORY.md` (patch steps verified on a copy of a pre-0.4.0 app)
+
+## Not changed / left for the owner
+- Local `.env` (untracked) still has `DB_PROVIDER=sqlite`; set `DB_PROVIDER=postgresql`, `DATABASE_URL` and a strong `JWT_SECRET` to run the framework locally.
+- Local `src/generated/prisma` was regenerated for PostgreSQL (`npm run generate:pg`) — gitignored build artifact.
+- `packages/create-techunico-app/.test-output/` (untracked output of the removed test-compose script) left in place.
+- Root analysis reports (`anlysysRport.md`, `architecture-gap-impact-analysis.md`, `issue2report.md`, `docs/framework-plugin-audit-and-design.md`) describe the pre-remediation state; not edited.
+- `supertest` devDependency is unused; left as is.
+- Production status of existing generated applications: **unknown — owner must confirm** (advisory §5).

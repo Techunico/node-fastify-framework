@@ -1,7 +1,11 @@
-import { {{name}}Service } from './{{name}}.service';
+export interface {{pascalName}}Record {
+  id: string;
+  name: string;
+  createdAt: Date;
+}
 
-declare module '@/types/services' {
-  interface BaseServices {
-    {{name}}: {{name}}Service
-  }
+/** Persistence contract; {{name}}.repository.ts implements it for this app's database. */
+export interface {{pascalName}}RepositoryContract {
+  findAll(): Promise<{{pascalName}}Record[]>;
+  create(data: { name: string }): Promise<{{pascalName}}Record>;
 }

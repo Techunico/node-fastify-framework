@@ -20,7 +20,6 @@ const assetsPrisma = path.join(cliRoot, "assets/prisma");
 /** Paths under src/ that never ship to applications. */
 export const EXCLUDED_SOURCE_PATHS = [
   "scripts/build-template.ts",
-  "scripts/add-plugin.ts",
   "experimental",
   "generated",
 ];

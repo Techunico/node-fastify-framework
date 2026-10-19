@@ -20,6 +20,7 @@
     "lib",
     "template",
     "overlays",
-    "assets"
+    "assets",
+    "CHANGELOG.md"
   ]
 }

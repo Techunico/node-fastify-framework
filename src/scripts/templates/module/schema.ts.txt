@@ -1,3 +1,7 @@
-import { z } from 'zod'
+import { z } from "zod";
 
-export const {{name}}Schema = z.object({})
+export const create{{pascalName}}Schema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+});
+
+export type Create{{pascalName}}Input = z.infer<typeof create{{pascalName}}Schema>;

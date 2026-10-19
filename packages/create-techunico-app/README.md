@@ -1,162 +1,51 @@
-# 🚀 Techunico Node Framework
+# @techunico/node-framework
 
-Internal backend framework built by Techunico for scalable, production-ready applications.
+Creates a Fastify 5 + TypeScript API with PostgreSQL (Prisma) or MongoDB (Mongoose),
+JWT auth, validation, health/readiness, metrics and optional plugins.
 
----
+```bash
+npx @techunico/node-framework my-api
+```
 
-# 🧠 Overview
+Requires Node.js 20 or newer.
 
-This repository contains:
-
-* 🧱 Framework core (`src/`)
-* 📦 Project template (`template/`)
-* ⚙️ CLI tool (`packages/create-techunico-app`)
-
----
-
-# 🏗️ Architecture
+## Options
 
 ```text
-root/
-├── src/                         # Framework core
-├── template/                    # Generated app template
-├── packages/
-│   └── create-techunico-app/    # CLI tool (published to npm)
+create-techunico-app <project-name> [options]
+
+  --db <postgresql|mongodb>   Database
+  --plugins <list|none>       Comma-separated optional plugins
+  --pm <npm|yarn|pnpm>        Package manager
+  --skip-install              Generate files only
+  -y, --yes                   Use defaults (postgresql, no plugins, npm) instead of prompting
 ```
 
----
+Project names must be lowercase npm-style names (`my-api`, `orders.v2`); the project is always
+created as a new directory inside the current directory.
 
-# 🚀 Getting Started (Development)
+## Optional plugins
 
-## 1. Install dependencies
+| Plugin | Provides | Requires | Packages |
+|---|---|---|---|
+| `redis` | `app.redis` | — | ioredis |
+| `cache` | `app.cache` | redis | — |
+| `queue` | `app.queue` (BullMQ) | redis | bullmq |
+| `events` | `app.event` | queue | — |
+| `geo` | `app.geo` (Google Maps Platform) | — (uses cache if enabled) | axios, geolib |
+| `cloudinary` | `app.cloudinary` | — | cloudinary |
+| `payment` | `app.payment` (Razorpay) | — | razorpay |
 
-```bash
-npm install
-```
+Required plugins are added automatically. Only selected plugins are copied into the project and
+only their packages are installed.
 
----
+## What you get
 
-## 2. Run framework locally
+- `.env` with unique, random JWT secrets (never printed); `.env.example` without secrets
+- `.gitignore` excluding `.env`, `node_modules`, `dist`, generated clients
+- Scripts: `dev`, `build`, `start`, `typecheck`, `test`, `make:module`, `seed` (+ Prisma scripts)
+- Startup validation: weak secrets, unknown plugins, missing plugin packages or credentials fail fast
+- Production safeguards: security headers, CORS allowlist, rate limiting (stricter on login and
+  register), protected `/metrics`, graceful shutdown, structured logs with credential redaction
 
-```bash
-npm run dev
-```
-
----
-
-# 🧱 Working on the Framework
-
-All core logic lives in:
-
-```text
-src/
-```
-
-Includes:
-
-* Modules system
-* Plugins
-* Auth + RBAC
-* Validation
-* Metrics + health
-* Service container
-
----
-
-# 📦 Updating Template
-
-Whenever you update the framework:
-
-```bash
-npm run build:template
-```
-
-This will:
-
-* Generate clean template
-* Sync into CLI package
-
----
-
-# ⚙️ Working on CLI
-
-```bash
-cd packages/create-techunico-app
-```
-
-Test locally:
-
-```bash
-npm link
-create-techunico-app test-app
-```
-
----
-
-# 🚀 Publishing CLI
-
-```bash
-cd packages/create-techunico-app
-
-npm version patch   # or minor / major
-npm publish --access public
-```
-
----
-
-# 🧪 Testing
-
-```bash
-npm run test
-```
-
----
-
-# 📂 Template Structure
-
-Generated apps will have:
-
-```text
-src/
-prisma/
-package.json
-tsconfig.json
-.env.example
-```
-
----
-
-# 🔥 Philosophy
-
-* Simple over complex
-* Explicit over magic
-* Production-ready by default
-
----
-
-# 👥 Team Workflow
-
-1. Develop features in `src/`
-2. Run:
-
-```bash
-npm run build:template
-```
-
-3. Test CLI
-4. Publish
-
----
-
-# 🔮 Future (Phase 2)
-
-* Redis (cache + queue)
-* WebSockets
-* Events system
-* Background jobs
-
----
-
-# 📄 License
-
-MIT
+See the generated project's README for configuration details.
