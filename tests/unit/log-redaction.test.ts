@@ -104,3 +104,14 @@ describe("provider error causes", () => {
     );
   });
 });
+
+describe("URL credentials", () => {
+  it("are removed from error messages", () => {
+    expect(scrubSecrets("connect ECONNREFUSED postgres://app:s3cr3t@db:5432/x")).toBe(
+      "connect ECONNREFUSED postgres://app:[REDACTED]@db:5432/x",
+    );
+    expect(toSafeCause(new Error("mongodb+srv://u:p4ss@cluster/db failed"))?.message).toBe(
+      "mongodb+srv://u:[REDACTED]@cluster/db failed",
+    );
+  });
+});

@@ -105,7 +105,7 @@ const registerPayment: FastifyPluginAsync<PaymentPluginOptions> = async (
   app: FastifyInstance,
   options: PaymentPluginOptions,
 ): Promise<void> => {
-  const config = options.config ?? loadPaymentConfig();
+  const config = options.config ?? loadPaymentConfig(app.config.source);
   const { adapters, defaultProvider } = buildAdapterRegistry(config, app.log);
 
   const service = new PaymentService(adapters, defaultProvider, app.log);
@@ -124,6 +124,9 @@ const registerPayment: FastifyPluginAsync<PaymentPluginOptions> = async (
     "Payment plugin registered",
   );
 };
+
+/** Used by the plugin registry to validate PAYMENT_* / RAZORPAY_* only when the plugin is enabled. */
+export const loadConfig = loadPaymentConfig;
 
 /** Register with `await app.register(PaymentPlugin)`. */
 export const PaymentPlugin = fp(registerPayment, { name: "payment" });

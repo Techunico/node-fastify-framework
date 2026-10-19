@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
-import { registerPlugins } from '@/plugins'
+import { registerPlugins, RegisterPluginsOptions } from '@/plugins'
 
-export async function setupPlugins(app: FastifyInstance) {
-  await registerPlugins(app)
+export async function setupPlugins(app: FastifyInstance, options: RegisterPluginsOptions = {}) {
+  await registerPlugins(app, options)
 }

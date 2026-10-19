@@ -29,7 +29,7 @@ const registerGeo: FastifyPluginAsync<GeoPluginOptions> = async (
   app: FastifyInstance,
   options: GeoPluginOptions,
 ): Promise<void> => {
-  const config = options.config ?? loadGeoConfig();
+  const config = options.config ?? loadGeoConfig(app.config.source);
   const providerNames = [config.provider, config.fallbackProvider]
     .filter((name): name is GeoProviderName => name !== undefined)
     .filter((name, index, names) => names.indexOf(name) === index);
@@ -43,6 +43,9 @@ const registerGeo: FastifyPluginAsync<GeoPluginOptions> = async (
     cacheEnabled: Boolean(cache),
   }, "Geo plugin registered");
 };
+
+/** Used by the plugin registry to validate GEO_* only when the plugin is enabled. */
+export const loadConfig = loadGeoConfig;
 
 /** Register with `await app.register(GeoPlugin)`. */
 export const GeoPlugin = fp(registerGeo, { name: "geo" });

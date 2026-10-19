@@ -1,45 +1,55 @@
-import { env } from "./env";
+import { parseEnv } from "./env";
 import { EnvConfig } from "./env.schema";
 
-export function buildConfig(source: EnvConfig) {
+export { ConfigError } from "./env";
+
+/** Environment record handed to plugin config loaders (validated per plugin, only when enabled). */
+export type EnvSource = Readonly<Record<string, string | undefined>>;
+
+export function buildConfig(env: EnvConfig, source: EnvSource = {}) {
   return {
     app: {
-      env: source.NODE_ENV,
-      host: source.HOST,
-      port: source.PORT,
+      env: env.NODE_ENV,
+      host: env.HOST,
+      port: env.PORT,
       api: {
-        prefix: source.API_PREFIX,
-        version: source.API_VERSION,
+        prefix: env.API_PREFIX,
+        version: env.API_VERSION,
       },
-      plugins: source.PLUGINS.split(",").map((p) => p.trim()).filter((p) => p.length > 0),
+      plugins: env.PLUGINS.split(",").map((p) => p.trim()).filter((p) => p.length > 0),
     },
 
     db:
-      source.DB_PROVIDER === "postgresql"
-        ? { provider: source.DB_PROVIDER, url: source.DATABASE_URL }
-        : { provider: source.DB_PROVIDER, url: source.MONGO_URI },
+      env.DB_PROVIDER === "postgresql"
+        ? { provider: env.DB_PROVIDER, url: env.DATABASE_URL }
+        : { provider: env.DB_PROVIDER, url: env.MONGO_URI },
 
     jwt: {
-      secret: source.JWT_SECRET,
-      adminSecret: source.JWT_ADMIN_SECRET,
-      issuer: source.JWT_ISSUER,
-      audience: source.JWT_AUDIENCE,
-      accessTtl: source.JWT_ACCESS_TTL,
-      refreshTtl: source.JWT_REFRESH_TTL,
+      secret: env.JWT_SECRET,
+      adminSecret: env.JWT_ADMIN_SECRET,
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE,
+      accessTtl: env.JWT_ACCESS_TTL,
+      refreshTtl: env.JWT_REFRESH_TTL,
     },
 
     log: {
-      level: source.LOG_LEVEL,
+      level: env.LOG_LEVEL,
     },
 
-    redis: {
-      host: source.REDIS_HOST,
-      port: source.REDIS_PORT,
-      password: source.REDIS_PASSWORD,
-    },
+    /** Raw environment for optional plugins' own config loaders. */
+    source,
   };
 }
 
 export type AppConfig = ReturnType<typeof buildConfig>;
 
-export const config = buildConfig(env);
+/**
+ * Validates `source` (normally `process.env`, after the entry point loaded
+ * `.env`) and returns the application configuration. Has no side effects:
+ * nothing reads configuration at import time.
+ */
+export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
+  const snapshot: EnvSource = Object.freeze({ ...source });
+  return buildConfig(parseEnv(snapshot as NodeJS.ProcessEnv), snapshot);
+}

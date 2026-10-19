@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { toSafeCause } from "@/core/safe-error";
 
 export async function healthRoutes(app: FastifyInstance) {
   // Liveness
@@ -15,7 +16,7 @@ export async function healthRoutes(app: FastifyInstance) {
     const { ready, checks, errors } = await app.readiness.run();
 
     for (const [name, err] of Object.entries(errors)) {
-      request.log.error({ err, check: name }, "Readiness check failed");
+      request.log.error({ err: toSafeCause(err), check: name }, "Readiness check failed");
     }
 
     return reply.status(ready ? 200 : 503).send({

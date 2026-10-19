@@ -2,12 +2,15 @@
 import 'dotenv/config';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { config } from '../../config';
+import { loadConfig } from '../../config';
+import { loadRedisConfig } from '../../plugins/redis/config';
+
+const redisConfig = loadRedisConfig(loadConfig(process.env).source);
 
 const connection = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password,
+  host: redisConfig.host,
+  port: redisConfig.port,
+  password: redisConfig.password,
   // Required by BullMQ workers (blocking commands).
   maxRetriesPerRequest: null,
 });

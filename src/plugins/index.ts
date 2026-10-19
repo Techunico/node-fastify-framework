@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { config } from "@/config";
+import type { DatabaseAdapter } from "@/core/interfaces/database";
+import type { Services } from "@/types/services";
 
 // core plugins
 import responsePlugin from "./response.plugin";
@@ -18,7 +19,9 @@ import {
 } from "./manifest";
 
 interface PluginModule {
-  default: FastifyPluginAsync;
+  default: FastifyPluginAsync<{ config?: unknown }>;
+  /** Validates the plugin's own environment variables; called only when the plugin is enabled. */
+  loadConfig?: (env: Readonly<Record<string, string | undefined>>) => unknown;
 }
 
 /**
@@ -26,7 +29,7 @@ interface PluginModule {
  * literal, so a disabled plugin's code (and npm packages) is never loaded and
  * its directory may be absent from a generated application.
  */
-async function loadOptionalPlugin(name: string): Promise<FastifyPluginAsync> {
+async function loadOptionalPlugin(name: string): Promise<PluginModule> {
   const entry = manifest.plugins[name];
 
   const missingPackages = findMissingPackages(entry);
@@ -58,10 +61,22 @@ async function loadOptionalPlugin(name: string): Promise<FastifyPluginAsync> {
   if (typeof loaded.default !== "function") {
     throw new PluginConfigurationError(`Plugin "${name}" (${specifier}) has no default export`);
   }
-  return loaded.default;
+  return loaded;
 }
 
-export async function registerPlugins(app: FastifyInstance) {
+export interface RegisterPluginsOptions {
+  /**
+   * Use this adapter as `app.db` instead of registering the database plugin
+   * (tests). It is used as-is: not connected or closed by the framework.
+   */
+  database?: DatabaseAdapter;
+  /** Replace service implementations (tests). */
+  services?: Partial<Services>;
+}
+
+export async function registerPlugins(app: FastifyInstance, options: RegisterPluginsOptions = {}) {
+  const { config } = app;
+
   // 🔌 DB Plugin
   if (config.db.provider !== databaseProvider) {
     throw new PluginConfigurationError(
@@ -71,7 +86,11 @@ export async function registerPlugins(app: FastifyInstance) {
   }
   app.decorate("readiness", new ReadinessRegistry());
 
-  await app.register(databasePlugin);
+  if (options.database) {
+    app.decorate("db", options.database as FastifyInstance["db"]);
+  } else {
+    await app.register(databasePlugin);
+  }
   app.readiness.add("database", () => app.db.ping());
 
   // 🧠 Core plugins (order matters)
@@ -79,13 +98,14 @@ export async function registerPlugins(app: FastifyInstance) {
   await app.register(responsePlugin);
   await app.register(metricsPlugin);
   await app.register(contextPlugin);
-  await app.register(servicesPlugin);
+  await app.register(servicesPlugin, { overrides: options.services });
 
   // 🔌 Optional plugins (driven by PLUGINS env), validated and ordered by the manifest
   const ordered = resolvePluginOrder(config.app.plugins, { nodeEnv: config.app.env });
 
   for (const name of ordered) {
     const plugin = await loadOptionalPlugin(name);
-    await app.register(plugin);
+    const pluginConfig = plugin.loadConfig?.(config.source);
+    await app.register(plugin.default, pluginConfig === undefined ? {} : { config: pluginConfig });
   }
 }

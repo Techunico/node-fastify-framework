@@ -1,8 +1,6 @@
 import bcrypt from "bcrypt";
-import { UserRepository } from "@/modules/user/user.repository";
-import { PrismaClient } from "@/generated/prisma/client";
 import { AppError } from "@/utils/app-error";
-import { RequestContext } from "@/types/request-context";
+import type { AuthUserRecord, UserRepositoryContract } from "@/modules/user/user.types";
 
 export interface AuthenticatedUser {
   id: string;
@@ -13,15 +11,11 @@ export interface AuthenticatedUser {
   createdAt: Date;
 }
 
-export class AuthService {
-  private repo: UserRepository;
+/** A valid bcrypt hash compared against when the user does not exist (equalises timing). */
+const DUMMY_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8.ExYhG0Dj7eBnmRWyFvdm5KfaO2vS";
 
-  constructor(
-    prisma: PrismaClient,
-    private ctx?: RequestContext,
-  ) {
-    this.repo = new UserRepository(prisma);
-  }
+export class AuthService {
+  constructor(private readonly repo: UserRepositoryContract) {}
 
   async register(data: { name: string; email: string; password: string }) {
     const existing = await this.repo.findByEmail(data.email);
@@ -30,15 +24,17 @@ export class AuthService {
       throw new AppError("Email already exists", 400, "EMAIL_EXISTS");
     }
 
-    const hashed = await bcrypt.hash(data.password, 10);
     const userRole = await this.repo.findRoleByName("user");
 
     if (!userRole) {
       throw new AppError("Default user role is missing", 500, "INTERNAL_SERVER_ERROR");
     }
 
+    const hashed = await bcrypt.hash(data.password, 10);
+
     await this.repo.create({
-      ...data,
+      name: data.name,
+      email: data.email,
       password: hashed,
       roleId: userRole.id,
     });
@@ -53,40 +49,23 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    void this.ctx;
-
     const user = await this.repo.findAuthUserByEmail(email);
+    const valid = await bcrypt.compare(password, user?.password ?? DUMMY_HASH);
 
-    if (!user) {
-      throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-
-    if (!valid) {
+    if (!user || !valid) {
       throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
     }
 
     return this.toAuthenticatedUser(user);
   }
 
-  private toAuthenticatedUser(user: {
-    id: number;
-    name: string;
-    email: string;
-    password: string;
-    createdAt: Date;
-    role: null | {
-      name: string;
-      permissions: Array<{ name: string }>;
-    };
-  }): AuthenticatedUser {
+  private toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {
     return {
-      id: user.id as unknown as string,
+      id: user.id,
       name: user.name,
       email: user.email,
       role: user.role?.name ?? null,
-      permissions: user.role?.permissions.map((permission) => permission.name) ?? [],
+      permissions: user.role?.permissions ?? [],
       createdAt: user.createdAt,
     };
   }

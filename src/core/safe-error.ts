@@ -15,9 +15,12 @@ export interface SafeErrorCause {
 
 const SECRET_QUERY_PARAM = /([?&](?:key|api_key|apikey|token|access_token|signature|secret)=)[^&\s]*/gi;
 
-/** Removes secret-looking query parameters from free text such as error messages. */
+/** `scheme://user:password@host` → `scheme://user:[REDACTED]@host` */
+const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/[^:/?#@\s]+):[^@/?#\s]+@/gi;
+
+/** Removes secret-looking query parameters and URL credentials from free text such as error messages. */
 export function scrubSecrets(text: string): string {
-  return text.replace(SECRET_QUERY_PARAM, "$1[REDACTED]");
+  return text.replace(SECRET_QUERY_PARAM, "$1[REDACTED]").replace(URL_CREDENTIALS, "$1:[REDACTED]@");
 }
 
 export function toSafeCause(error: unknown): SafeErrorCause | undefined {

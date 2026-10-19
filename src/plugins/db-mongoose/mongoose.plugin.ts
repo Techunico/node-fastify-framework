@@ -1,6 +1,5 @@
 import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
-import { config } from "@/config";
 import { MongooseAdapter } from "./mongoose.adapter";
 import { registerModels, RegisterModelsOptions } from "./model-loader";
 
@@ -12,7 +11,7 @@ export interface MongoosePluginOptions {
 
 async function mongoosePlugin(app: FastifyInstance, options: MongoosePluginOptions) {
   // One adapter per process; models use mongoose's default connection only.
-  const db = new MongooseAdapter(options.uri ?? config.db.url);
+  const db = new MongooseAdapter(options.uri ?? app.config.db.url);
   db.setLogger(app.log);
 
   await db.connect();

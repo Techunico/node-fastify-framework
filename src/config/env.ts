@@ -21,5 +21,3 @@ export function parseEnv(source: NodeJS.ProcessEnv): EnvConfig {
 
   return parsed.data
 }
-
-export const env = parseEnv(process.env)

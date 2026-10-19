@@ -1,15 +1,31 @@
 import fp from "fastify-plugin";
-import { PrismaClient } from "@/generated/prisma/client";
 import { AuthService } from "@/modules/auth/auth.service";
+import { UserRepository } from "@/modules/user/user.repository";
+import { UserService } from "@/modules/user/user.service";
+import type { Services } from "@/types/services";
 
-export default fp(async (app) => {
-  app.decorateRequest("services", null);
+export interface ServicesPluginOptions {
+  /** Replace individual services (tests). */
+  overrides?: Partial<Services>;
+}
 
-  app.addHook("onRequest", async (request) => {
-    const prisma = request.server.db.getClient() as PrismaClient;
+/**
+ * Application service container. Services are stateless and built once;
+ * `request.services` exposes the same instances to route handlers.
+ */
+export default fp(async (app, options: ServicesPluginOptions) => {
+  const users = new UserRepository(app.db);
 
-    request.services = {
-      auth: new AuthService(prisma, request.ctx),
-    };
+  const services: Services = {
+    auth: new AuthService(users),
+    users: new UserService(users),
+    ...options.overrides,
+  };
+
+  app.decorate("services", services);
+  app.decorateRequest("services", {
+    getter() {
+      return services;
+    },
   });
-});
+}, { name: "services" });

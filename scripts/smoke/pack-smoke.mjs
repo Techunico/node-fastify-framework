@@ -396,7 +396,12 @@ async function checkApp(c, appDir, infra, secrets) {
     assert(c.id, "forged admin token → 401", forged.status === 401, JSON.stringify(forged.json));
 
     const badLogin = await http(server.base, "POST", "/api/v1/auth/login", { body: { email, password: "wrong-password" } });
-    assert(c.id, "wrong password → 401", badLogin.status === 401, String(badLogin.status));
+    assert(
+      c.id,
+      "wrong password → 401 in the standard error envelope",
+      badLogin.status === 401 && badLogin.json?.success === false && badLogin.json?.error?.type === "INVALID_CREDENTIALS",
+      JSON.stringify(badLogin.json),
+    );
 
     const logs = server.getOutput();
     assert(c.id, "logs contain no JWT secret or token", !logs.includes(env.JWT_SECRET) && !(token && logs.includes(token)), "secret found in logs");

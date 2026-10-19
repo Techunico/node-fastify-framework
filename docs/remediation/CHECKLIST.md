@@ -24,7 +24,7 @@ Scope notes (pulled forward because the Phase 1 gate cannot pass without them):
 - [x] F-02 lazy, manifest-driven plugin registry; Mongo model loading inside db-mongoose plugin; readiness registry
 - [x] F-03 CLI: declared deps, engines, name validation, non-interactive flags, safe failure handling
 - [x] F-06 `_gitignore` shipped and renamed at generation
-- [~] Packaging smoke gate (pack → install outside repo → generate PG/Mongo × none/all → install → typecheck → start → assertions) — `scripts/smoke/pack-smoke.mjs`
+- [x] Packaging smoke gate (pack → install outside repo → generate PG/Mongo × none/all → install → typecheck → start → assertions) — `scripts/smoke/pack-smoke.mjs`: 110/110
 
 Contract changes introduced in Phase 1 (for the changelog / advisory):
 - Tokens now carry `kid`, `iss`, `aud`; tokens issued by earlier versions are rejected (forced re-login).
@@ -37,14 +37,20 @@ Contract changes introduced in Phase 1 (for the changelog / advisory):
 - Removed unreferenced stubs: metrics controller/service/repository/schema, `auth.repository.ts`, `db-prisma/prisma.adapter.ts`, `config/app.ts`, `bootstrap/config.ts`.
 
 ## Phase 2 — one source of truth
-- [ ] Manifest drives registry + CLI (no duplicated dependency lists); unknown plugins / missing deps fail
-- [ ] Config: no import side effects; plugin config validated only when enabled; injected into plugins
-- [ ] Overlays reduced to genuinely DB-specific files + drift check
-- [ ] F-08 framework `src/` runnable (PG) — no `app.prisma`, working services
-- [ ] F-09 type-check without OOM; augmentation checked; optional decorators accurate
-- [ ] F-19 conflicting Mongo model registration detected
-- [ ] Tests: unit, inject integration, plugin registry, config, model registry, drift
-- [ ] CI workflow
+- [x] Manifest drives registry + CLI (no duplicated dependency lists); unknown plugins / missing deps fail; versions pinned to root package.json by test
+- [x] Config: no import side effects (`loadConfig()` at entry → `buildApp({ config })` → `app.config`); plugin config (`loadConfig` export per plugin) validated only when enabled; no runtime `process.env` reads outside entry points/scripts
+- [x] Overlays reduced to 4 genuinely DB-specific files (mongodb: seed, models, user repository, database binding; postgresql: none) + drift test
+- [x] F-08 framework `src/` coherent: one services container, repository contract, `app.db` typed per binding
+- [x] F-09 type-check without OOM (≈3 s); `src/types/fastify.ts` is checked; optional decorators typed optional; jest types only in tsconfig.test.json
+- [x] F-19 conflicting Mongo model registration detected (tests)
+- [x] Tests: 110 (unit + Fastify-inject integration: health/ready, auth round trip, envelope, startup validation, model registry, drift, manifest/package coverage)
+- [~] CI workflow `.github/workflows/ci.yml` — YAML validated locally; **not executed** (needs GitHub runners)
+
+Defects found while adding Phase 2 tests (fixed):
+- Module routes never used the framework error handler (it was set after modules were registered) → generated apps returned Fastify's default error shape.
+- `reply.success()` / `reply.error()` returned `void`; now return the reply.
+- URL credentials (`scheme://user:pass@host`) could reach logs via readiness errors; now scrubbed.
+- Login on an unknown email skipped bcrypt (timing difference); now compares against a dummy hash.
 
 ## Phase 3 — production hardening
 - [ ] F-12 graceful shutdown (signals, timeout, BullMQ close, startup errors)

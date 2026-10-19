@@ -1,12 +1,12 @@
-// import { PrismaClient } from '@/generated/prisma/client'
-// import { RequestContext } from './request-context'
+import type { AuthService } from "@/modules/auth/auth.service";
+import type { UserService } from "@/modules/user/user.service";
 
-// // import services
-// import { AuthService } from '@/modules/auth/auth.service'
-
-// export interface Services {
-//   prisma: PrismaClient
-//   auth: AuthService
-// }
-
-export interface BaseServices {};
+/**
+ * Services available as `app.services` and `request.services`.
+ * Add an entry here when a module registers a new service in
+ * src/plugins/services.plugin.ts.
+ */
+export interface Services {
+  auth: AuthService;
+  users: UserService;
+}

@@ -28,7 +28,7 @@ const registerCloudinary: FastifyPluginAsync<CloudinaryPluginOptions> = async (
   app: FastifyInstance,
   options: CloudinaryPluginOptions,
 ): Promise<void> => {
-  const config = options.config ?? loadCloudinaryConfig();
+  const config = options.config ?? loadCloudinaryConfig(app.config.source);
   const requireConfigured = options.requireConfigured !== false;
 
   if (!isCloudinaryConfigured(config)) {
@@ -52,6 +52,9 @@ const registerCloudinary: FastifyPluginAsync<CloudinaryPluginOptions> = async (
     "Cloudinary plugin registered",
   );
 };
+
+/** Used by the plugin registry to validate CLOUDINARY_* only when the plugin is enabled. */
+export const loadConfig = loadCloudinaryConfig;
 
 export const CloudinaryPlugin = fp(registerCloudinary, { name: "cloudinary" });
 export default CloudinaryPlugin;

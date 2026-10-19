@@ -1,7 +1,6 @@
 import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
 import { PrismaClient } from "@/generated/prisma/client";
-import { config } from "@/config";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import type { DatabaseAdapter } from "@/core/interfaces/database";
@@ -40,7 +39,7 @@ export interface PrismaPluginOptions {
 }
 
 async function prismaPlugin(app: FastifyInstance, options: PrismaPluginOptions) {
-  const pool = new pg.Pool({ connectionString: options.url ?? config.db.url });
+  const pool = new pg.Pool({ connectionString: options.url ?? app.config.db.url });
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   const db = new PrismaAdapter(prisma);
 

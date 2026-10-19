@@ -34,7 +34,7 @@ const RAZORPAY_KEY_ID_FORMAT = /^rzp_(live|test)_[A-Za-z0-9]+$/;
  *
  * The mock gateway is only allowed outside production.
  */
-export function loadPaymentConfig(env: NodeJS.ProcessEnv = process.env): PaymentPluginConfig {
+export function loadPaymentConfig(env: Readonly<Record<string, string | undefined>>): PaymentPluginConfig {
   const value = (name: string): string => env[name]?.trim() ?? "";
   const defaultCurrency = value("PAYMENT_CURRENCY") || "INR";
   const keyId = value("RAZORPAY_KEY_ID");

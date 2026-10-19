@@ -1,17 +1,13 @@
-// Load .env before anything reads configuration.
+// Entry point: load .env, validate configuration, start the server.
 import "dotenv/config";
-import { config } from "./config";
+import { loadConfig } from "./config";
 import { buildApp } from "./app";
 
 async function start() {
-  const app = await buildApp();
+  const config = loadConfig(process.env);
+  const app = await buildApp({ config });
 
-  try {
-    await app.listen({ port: config.app.port, host: config.app.host });
-  } catch (err) {
-    app.log.error(err);
-    process.exit(1);
-  }
+  await app.listen({ port: config.app.port, host: config.app.host });
 }
 
 start().catch((err) => {

@@ -11,10 +11,12 @@ const baseEnv = () => ({
 });
 
 describe("environment schema", () => {
-  it("accepts a minimal PostgreSQL configuration without Redis settings", () => {
-    const parsed = envSchema.parse(baseEnv());
+  it("accepts a minimal PostgreSQL configuration without any plugin settings", () => {
+    const parsed = envSchema.parse({ ...baseEnv(), REDIS_PORT: "not-a-port", RAZORPAY_KEY_ID: "junk" });
     expect(parsed.DB_PROVIDER).toBe("postgresql");
-    expect(parsed.REDIS_PORT).toBe(6379);
+    // Plugin variables are validated by the plugins themselves, only when enabled.
+    expect(parsed).not.toHaveProperty("REDIS_PORT");
+    expect(parsed).not.toHaveProperty("RAZORPAY_KEY_ID");
   });
 
   it("requires the URL for the selected database", () => {

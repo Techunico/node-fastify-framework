@@ -1,7 +1,7 @@
 import fp from 'fastify-plugin';
 import Redis from 'ioredis';
 import { FastifyInstance } from 'fastify';
-import { config } from "@/config";
+import { loadRedisConfig, RedisPluginConfig } from './config';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -10,11 +10,20 @@ declare module 'fastify' {
   }
 }
 
-export default fp(async (app: FastifyInstance) => {
+export interface RedisPluginOptions {
+  config?: RedisPluginConfig;
+}
+
+/** Used by the plugin registry to validate REDIS_* only when the plugin is enabled. */
+export const loadConfig = loadRedisConfig;
+
+export default fp(async (app: FastifyInstance, options: RedisPluginOptions) => {
+  const config = options.config ?? loadRedisConfig(app.config.source);
+
   const redis = new Redis({
-    host: config.redis.host,
-    port: config.redis.port,
-    password: config.redis.password,
+    host: config.host,
+    port: config.port,
+    password: config.password,
   });
 
   redis.on('connect', () => {

@@ -2,7 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { FastifyInstance } from "fastify";
 import { toKebabCase } from "@/utils/string/case";
-import { config } from "@/config";
 
 export async function registerModules(app: FastifyInstance) {
   const modulesPath = path.resolve(__dirname, "..", "modules");
@@ -10,7 +9,7 @@ export async function registerModules(app: FastifyInstance) {
     .readdirSync(modulesPath, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
     .map((entry) => entry.name);
-  const basePrefix = `${config.app.api.prefix}/${config.app.api.version}`;
+  const basePrefix = `${app.config.app.api.prefix}/${app.config.app.api.version}`;
   const moduleFileName = path.extname(__filename) === ".js" ? "index.js" : "index.ts";
 
   for (const dir of moduleDirs) {

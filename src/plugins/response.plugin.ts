@@ -1,17 +1,17 @@
 import fp from 'fastify-plugin'
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyReply } from 'fastify'
 
 async function responsePlugin(app: FastifyInstance) {
-  app.decorateReply('success', function (data: any, statusCode = 200) {
-    this.status(statusCode).send({
+  app.decorateReply('success', function (this: FastifyReply, data: unknown, statusCode = 200) {
+    return this.status(statusCode).send({
       success: true,
       data,
       error: null,
     })
   })
 
-  app.decorateReply('error', function (error: any, statusCode = 500) {
-    this.status(statusCode).send({
+  app.decorateReply('error', function (this: FastifyReply, error: unknown, statusCode = 500) {
+    return this.status(statusCode).send({
       success: false,
       data: null,
       error,
@@ -19,4 +19,4 @@ async function responsePlugin(app: FastifyInstance) {
   })
 }
 
-export default fp(responsePlugin)
+export default fp(responsePlugin, { name: 'response' })
