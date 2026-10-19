@@ -2,6 +2,7 @@ export const ErrorCodes = {
   // Auth
   UNAUTHORIZED: 'UNAUTHORIZED',
   INVALID_TOKEN: 'INVALID_TOKEN',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   FORBIDDEN: 'FORBIDDEN',
 
@@ -16,6 +17,8 @@ export const ErrorCodes = {
   INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
   NOT_READY: 'NOT_READY',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  NOT_FOUND: 'NOT_FOUND',
+  RATE_LIMITED: 'RATE_LIMITED',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]

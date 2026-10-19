@@ -1,16 +1,13 @@
 import fp from "fastify-plugin";
-import { randomUUID } from "crypto";
 
+/**
+ * Request context. `request.id` (and the `requestId` log label) comes from
+ * Fastify's genReqId (see src/app.ts); it is echoed as `x-request-id` so
+ * clients and upstream proxies can correlate logs.
+ */
 export default fp(async (app) => {
-  app.addHook("onRequest", async (request) => {
-    const requestId = randomUUID();
-
-    request.ctx = { requestId };
-
-    //   request.ctx.tenant = {
-    //   id: string;
-    // };
-
-    request.log = request.log.child({ requestId });
+  app.addHook("onRequest", async (request, reply) => {
+    request.ctx = { requestId: request.id };
+    reply.header("x-request-id", request.id);
   });
-});
+}, { name: "context" });

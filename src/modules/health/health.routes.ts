@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { toSafeCause } from "@/core/safe-error";
 
 export async function healthRoutes(app: FastifyInstance) {
   // Liveness
@@ -10,45 +11,21 @@ export async function healthRoutes(app: FastifyInstance) {
     });
   });
 
-  // Readiness
+  // Readiness: database plus every check contributed by enabled plugins.
   app.get("/ready", async (request, reply) => {
-    const checks: Record<string, { status: "ok" | "fail"; message?: string }> =
-      {};
+    const { ready, checks, errors } = await app.readiness.run();
 
-    // Database check
-    try {
-      await request.server.prisma.$queryRaw`SELECT 1`;
-      checks.database = { status: "ok" };
-    } catch (err) {
-      request.log.error(err);
-      checks.database = { status: "fail", message: "Database unreachable" };
+    for (const [name, err] of Object.entries(errors)) {
+      request.log.error({ err: toSafeCause(err), check: name }, "Readiness check failed");
     }
 
-    // Redis check
-    try {
-      const pong = await app.redis.ping();
-      checks.redis =
-        pong === "PONG"
-          ? { status: "ok" }
-          : { status: "fail", message: `Unexpected ping response: ${pong}` };
-    } catch (err) {
-      request.log.error(err);
-      checks.redis = { status: "fail", message: "Redis unreachable" };
-    }
-
-    // Add more services here the same way:
-    // checks.s3 = { status: 'ok' }
-    // checks.thirdPartyApi = { status: 'fail', message: '...' }
-
-    const allReady = Object.values(checks).every((c) => c.status === "ok");
-
-    return reply.status(allReady ? 200 : 503).send({
-      success: allReady,
+    return reply.status(ready ? 200 : 503).send({
+      success: ready,
       data: {
-        status: allReady ? "ready" : "degraded",
+        status: ready ? "ready" : "degraded",
         checks,
       },
-      error: allReady
+      error: ready
         ? null
         : {
             type: "NOT_READY",

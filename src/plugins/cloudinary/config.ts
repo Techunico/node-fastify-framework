@@ -1,7 +1,7 @@
 import { CloudinaryError, CloudinaryNotConfiguredError } from "./errors";
 import type { CloudinaryPluginConfig } from "./types";
 
-const value = (name: string): string => process.env[name]?.trim() ?? "";
+type EnvSource = Readonly<Record<string, string | undefined>>;
 
 /**
  * Reads Cloudinary credentials from the environment.
@@ -10,7 +10,8 @@ const value = (name: string): string => process.env[name]?.trim() ?? "";
  * CLOUDINARY_DEFAULT_FOLDER (optional, default: "general")
  * CLOUDINARY_SECURE (optional, default: true)
  */
-export function loadCloudinaryConfig(): CloudinaryPluginConfig {
+export function loadCloudinaryConfig(env: EnvSource): CloudinaryPluginConfig {
+  const value = (name: string): string => env[name]?.trim() ?? "";
   return {
     cloudName: value("CLOUDINARY_CLOUD_NAME"),
     apiKey: value("CLOUDINARY_API_KEY"),

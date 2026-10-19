@@ -1,79 +1,111 @@
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
 
-const PRISMA_ARTIFACTS = [
-  "prisma",
-  "prisma.config.ts",
-  "src/generated",
-  "src/plugins/db-prisma",
-];
+const PACKAGE_ROOT = path.join(__dirname, "..");
+const DEFAULT_TEMPLATE_DIR = path.join(PACKAGE_ROOT, "template");
+const DEFAULT_ASSETS_DIR = path.join(PACKAGE_ROOT, "assets");
+const DEFAULT_OVERLAYS_DIR = path.join(PACKAGE_ROOT, "overlays");
 
-const MONGOOSE_ARTIFACTS = ["src/plugins/db-mongoose"];
+const DATABASES = ["postgresql", "mongodb"];
+const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm"];
 
-const PRISMA_REPOSITORY_FILES = [
-  "src/modules/auth/auth.repository.ts",
-  "src/modules/user/user.repository.ts",
-  "src/modules/metrics/metrics.repository.ts",
-];
+const DEFAULT_URLS = {
+  postgresql: "postgresql://user:password@localhost:5432/db",
+  mongodb: "mongodb://localhost:27017/db",
+};
 
-function resolveProject(projectRoot, relativePath) {
-  return path.join(projectRoot, relativePath);
+const RESERVED_NAMES = new Set(["node_modules", "favicon.ico", "template"]);
+
+class GenerationError extends Error {}
+
+function readManifest(templateDir = DEFAULT_TEMPLATE_DIR) {
+  const manifestPath = path.join(templateDir, "src", "framework.manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    throw new GenerationError(
+      `Template is incomplete (missing ${path.relative(PACKAGE_ROOT, manifestPath)}). ` +
+        "Run `npm run build:template` in the framework repository.",
+    );
+  }
+  return JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
 }
 
-function removeIfExists(projectRoot, relativePath) {
-  const fullPath = resolveProject(projectRoot, relativePath);
+/** Throws a GenerationError describing why `name` is not a safe project name. */
+function validateProjectName(name) {
+  if (typeof name !== "string" || name.length === 0) {
+    throw new GenerationError("Please provide a project name, e.g. `create-techunico-app my-api`");
+  }
+  if (name.length > 214) {
+    throw new GenerationError("Project name must be at most 214 characters");
+  }
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(name)) {
+    throw new GenerationError(
+      `Invalid project name "${name}": use lowercase letters, digits, ".", "_" or "-", ` +
+        "starting with a letter or digit (no paths or spaces).",
+    );
+  }
+  if (RESERVED_NAMES.has(name)) {
+    throw new GenerationError(`"${name}" is a reserved name`);
+  }
+}
 
-  if (!fs.existsSync(fullPath)) {
-    return;
+/** Resolves the destination directory and guarantees it is a direct child of `cwd`. */
+function resolveTarget(cwd, name) {
+  validateProjectName(name);
+  const base = path.resolve(cwd);
+  const target = path.resolve(base, name);
+  if (path.dirname(target) !== base) {
+    throw new GenerationError(`Refusing to create a project outside ${base}`);
+  }
+  return target;
+}
+
+/**
+ * Returns `requested` plus every plugin they require (transitively), in
+ * manifest order. Throws for unknown plugin names.
+ */
+function resolvePlugins(manifest, requested) {
+  const known = Object.keys(manifest.plugins);
+  const unknown = requested.filter((name) => !known.includes(name));
+  if (unknown.length) {
+    throw new GenerationError(
+      `Unknown plugin(s): ${unknown.join(", ")}. Available: ${known.join(", ")}`,
+    );
   }
 
+  const selected = new Set();
+  const visit = (name) => {
+    if (selected.has(name)) return;
+    selected.add(name);
+    for (const dependency of manifest.plugins[name].requires) visit(dependency);
+  };
+  requested.forEach(visit);
+
+  return known.filter((name) => selected.has(name));
+}
+
+function removePath(projectRoot, relativePath) {
+  const fullPath = path.join(projectRoot, relativePath);
+  if (!fullPath.startsWith(projectRoot + path.sep)) {
+    throw new GenerationError(`Refusing to remove path outside the project: ${relativePath}`);
+  }
   fs.rmSync(fullPath, { recursive: true, force: true });
 }
 
-function applyOverlay(projectRoot, overlayDir) {
-  if (!fs.existsSync(overlayDir)) {
-    return;
-  }
-
-  const walk = (currentSrc, currentDest) => {
-    const entries = fs.readdirSync(currentSrc, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrc, entry.name);
-      const destPath = path.join(currentDest, entry.name);
-
-      if (entry.isDirectory()) {
-        fs.mkdirSync(destPath, { recursive: true });
-        walk(srcPath, destPath);
-        continue;
-      }
-
-      fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.copyFileSync(srcPath, destPath);
-    }
-  };
-
-  walk(overlayDir, projectRoot);
+function copyDirectory(source, destination) {
+  if (!fs.existsSync(source)) return;
+  fs.cpSync(source, destination, { recursive: true, force: true });
 }
 
-function readEnvFile(projectRoot) {
-  const envPath = resolveProject(projectRoot, ".env");
-  return fs.readFileSync(envPath, "utf-8");
+function generateSecret() {
+  return crypto.randomBytes(48).toString("base64url");
 }
 
-function writeEnvFile(projectRoot, content) {
-  const envPath = resolveProject(projectRoot, ".env");
-  fs.writeFileSync(envPath, content);
-}
-
-function upsertEnvValue(content, key, value) {
+function setEnvValue(content, key, value) {
   const pattern = new RegExp(`^${key}=.*$`, "m");
-
   if (pattern.test(content)) {
-    return content.replace(pattern, `${key}=${value}`);
+    return content.replace(pattern, () => `${key}=${value}`);
   }
-
   return `${content.trimEnd()}\n${key}=${value}\n`;
 }
 
@@ -84,180 +116,156 @@ function removeEnvKey(content, key) {
     .join("\n");
 }
 
-function cleanPackageJson(projectRoot, db) {
-  const pkgPath = resolveProject(projectRoot, "package.json");
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+function sortedObject(record) {
+  return Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
+}
 
-  const prismaDeps = [
-    "@prisma/client",
-    "@prisma/adapter-pg",
-    "@prisma/adapter-better-sqlite3",
-    "pg",
-    "prisma",
-  ];
+function buildPackageJson(basePackage, manifest, { name, db, plugins }) {
+  const database = manifest.databases[db];
 
-  const prismaScripts = ["generate", "migrate", "migrate:pg", "migrate:sqlite", "generate:pg", "generate:sqlite", "seed", "studio"];
+  const dependencies = { ...manifest.core.dependencies, ...database.dependencies };
+  for (const plugin of plugins) {
+    Object.assign(dependencies, manifest.plugins[plugin].dependencies);
+  }
 
+  const devDependencies = { ...manifest.core.devDependencies, ...database.devDependencies };
+
+  const scripts = { ...basePackage.scripts };
+  if (db === "postgresql") {
+    // The generated Prisma client is JavaScript, so tsc does not emit it.
+    scripts.build = `${scripts.build} && node -e "require('fs').cpSync('src/generated','dist/generated',{recursive:true})"`;
+    Object.assign(scripts, {
+      generate: "prisma generate",
+      migrate: "prisma migrate dev",
+      "migrate:deploy": "prisma migrate deploy",
+      seed: "ts-node prisma/seed.ts",
+    });
+  }
   if (db === "mongodb") {
-    for (const dep of prismaDeps) {
-      delete pkg.dependencies?.[dep];
-      delete pkg.devDependencies?.[dep];
+    scripts.seed = "ts-node -r tsconfig-paths/register scripts/seed.ts";
+  }
+
+  return {
+    ...basePackage,
+    name,
+    version: "0.1.0",
+    private: true,
+    engines: { node: manifest.node },
+    scripts,
+    dependencies: sortedObject(dependencies),
+    devDependencies: sortedObject(devDependencies),
+  };
+}
+
+function configureEnvironment(projectRoot, { db, plugins }) {
+  const examplePath = path.join(projectRoot, ".env.example");
+  if (!fs.existsSync(examplePath)) {
+    throw new GenerationError("Template is incomplete (missing .env.example)");
+  }
+
+  const otherUrlKey = db === "postgresql" ? "MONGO_URI" : "DATABASE_URL";
+  const urlKey = db === "postgresql" ? "DATABASE_URL" : "MONGO_URI";
+
+  let example = fs.readFileSync(examplePath, "utf-8");
+  example = setEnvValue(example, "DB_PROVIDER", db);
+  example = removeEnvKey(example, otherUrlKey);
+  example = setEnvValue(example, urlKey, DEFAULT_URLS[db]);
+  fs.writeFileSync(examplePath, example);
+
+  // .env gets fresh random secrets; .env.example keeps them blank.
+  let env = setEnvValue(example, "PLUGINS", plugins.join(","));
+  env = setEnvValue(env, "JWT_SECRET", generateSecret());
+  env = setEnvValue(env, "JWT_ADMIN_SECRET", generateSecret());
+
+  const envPath = path.join(projectRoot, ".env");
+  fs.writeFileSync(envPath, env, { mode: 0o600 });
+}
+
+/**
+ * Creates a new application in `target` (which must not exist).
+ * On failure, the partially generated directory is removed.
+ */
+function generateProject(options) {
+  const {
+    target,
+    name,
+    db,
+    plugins: requestedPlugins = [],
+    templateDir = DEFAULT_TEMPLATE_DIR,
+    assetsDir = DEFAULT_ASSETS_DIR,
+    overlaysDir = DEFAULT_OVERLAYS_DIR,
+  } = options;
+
+  if (!DATABASES.includes(db)) {
+    throw new GenerationError(`Unsupported database "${db}". Use one of: ${DATABASES.join(", ")}`);
+  }
+  if (fs.existsSync(target)) {
+    throw new GenerationError(`Folder already exists: ${target}`);
+  }
+
+  const manifest = readManifest(templateDir);
+  const plugins = resolvePlugins(manifest, requestedPlugins);
+
+  fs.mkdirSync(target, { recursive: false });
+
+  try {
+    copyDirectory(templateDir, target);
+
+    // npm strips files named .gitignore from published packages.
+    const shippedGitignore = path.join(target, "_gitignore");
+    if (fs.existsSync(shippedGitignore)) {
+      fs.renameSync(shippedGitignore, path.join(target, ".gitignore"));
     }
 
-    for (const script of prismaScripts) {
-      delete pkg.scripts?.[script];
+    // Database composition: drop the other database's files, apply overlay.
+    for (const other of DATABASES.filter((candidate) => candidate !== db)) {
+      for (const file of manifest.databases[other].files) removePath(target, file);
     }
-
-    delete pkg.prisma;
-  }
-
-  if (db === "postgresql") {
-    delete pkg.dependencies?.mongoose;
-  }
-
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-}
-
-function setupPostgreSQL(projectRoot, assetsDir) {
-  for (const artifact of MONGOOSE_ARTIFACTS) {
-    removeIfExists(projectRoot, artifact);
-  }
-
-  const prismaAssetsDir = path.join(assetsDir, "prisma");
-  const schemaSource = path.join(prismaAssetsDir, "schema.postgresql.prisma");
-  const schemaTarget = resolveProject(projectRoot, "prisma/schema.prisma");
-
-  fs.mkdirSync(path.dirname(schemaTarget), { recursive: true });
-  fs.copyFileSync(schemaSource, schemaTarget);
-
-  const seedSource = path.join(prismaAssetsDir, "seed.ts");
-  if (fs.existsSync(seedSource)) {
-    fs.copyFileSync(seedSource, resolveProject(projectRoot, "prisma/seed.ts"));
-  }
-
-  const configSource = path.join(
-    prismaAssetsDir,
-    "prisma.config.ts.template",
-  );
-  if (!fs.existsSync(configSource)) {
-    throw new Error(
-      "Missing prisma.config.ts.template in CLI assets. Run `npm run build:template` in the framework repo.",
-    );
-  }
-
-  fs.copyFileSync(
-    configSource,
-    resolveProject(projectRoot, "prisma.config.ts"),
-  );
-
-  const overlayDir = path.join(path.dirname(assetsDir), "overlays", "postgresql");
-  applyOverlay(projectRoot, overlayDir);
-}
-
-function setupMongoDB(projectRoot) {
-  for (const artifact of PRISMA_ARTIFACTS) {
-    removeIfExists(projectRoot, artifact);
-  }
-
-  for (const file of PRISMA_REPOSITORY_FILES) {
-    removeIfExists(projectRoot, file);
-  }
-
-  const overlayDir = path.join(__dirname, "..", "overlays", "mongodb");
-  applyOverlay(projectRoot, overlayDir);
-}
-
-function ensureEnvFile(projectRoot) {
-  const envPath = resolveProject(projectRoot, ".env");
-  const envExamplePath = resolveProject(projectRoot, ".env.example");
-
-  if (!fs.existsSync(envPath) && fs.existsSync(envExamplePath)) {
-    fs.copyFileSync(envExamplePath, envPath);
-  }
-
-  if (!fs.existsSync(envPath)) {
-    throw new Error("Missing .env and .env.example in generated project");
-  }
-}
-
-function configureEnvironment(projectRoot, db) {
-  ensureEnvFile(projectRoot);
-  let envContent = readEnvFile(projectRoot);
-
-  envContent = upsertEnvValue(envContent, "DB_PROVIDER", db);
-
-  if (db === "postgresql") {
-    envContent = removeEnvKey(envContent, "MONGO_URI");
-    envContent = upsertEnvValue(
-      envContent,
-      "DATABASE_URL",
-      "postgresql://user:password@localhost:5432/db",
-    );
-  }
-
-  if (db === "mongodb") {
-    envContent = removeEnvKey(envContent, "DATABASE_URL");
-    envContent = upsertEnvValue(
-      envContent,
-      "MONGO_URI",
-      "mongodb://localhost:27017/db",
-    );
-  }
-
-  writeEnvFile(projectRoot, envContent);
-
-  const envExamplePath = resolveProject(projectRoot, ".env.example");
-  if (fs.existsSync(envExamplePath)) {
-    let exampleContent = fs.readFileSync(envExamplePath, "utf-8");
-    exampleContent = upsertEnvValue(exampleContent, "DB_PROVIDER", db);
+    copyDirectory(path.join(overlaysDir, db), target);
 
     if (db === "postgresql") {
-      exampleContent = removeEnvKey(exampleContent, "MONGO_URI");
-      exampleContent = upsertEnvValue(
-        exampleContent,
-        "DATABASE_URL",
-        "postgresql://user:password@localhost:5432/db",
+      const prismaAssets = path.join(assetsDir, "prisma");
+      fs.mkdirSync(path.join(target, "prisma"), { recursive: true });
+      fs.copyFileSync(
+        path.join(prismaAssets, "schema.postgresql.prisma"),
+        path.join(target, "prisma", "schema.prisma"),
+      );
+      fs.copyFileSync(path.join(prismaAssets, "seed.ts"), path.join(target, "prisma", "seed.ts"));
+      fs.copyFileSync(
+        path.join(prismaAssets, "prisma.config.ts.template"),
+        path.join(target, "prisma.config.ts"),
       );
     }
 
-    if (db === "mongodb") {
-      exampleContent = removeEnvKey(exampleContent, "DATABASE_URL");
-      exampleContent = upsertEnvValue(
-        exampleContent,
-        "MONGO_URI",
-        "mongodb://localhost:27017/db",
-      );
+    // Only enabled plugins are copied; their npm packages are the only ones installed.
+    for (const [plugin, entry] of Object.entries(manifest.plugins)) {
+      if (!plugins.includes(plugin)) {
+        for (const file of entry.files) removePath(target, file);
+      }
     }
 
-    fs.writeFileSync(envExamplePath, exampleContent);
+    const packagePath = path.join(target, "package.json");
+    const basePackage = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
+    const pkg = buildPackageJson(basePackage, manifest, { name, db, plugins });
+    fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+    configureEnvironment(target, { db, plugins });
+
+    return { target, db, plugins, packageJson: pkg };
+  } catch (error) {
+    fs.rmSync(target, { recursive: true, force: true });
+    throw error;
   }
-}
-
-function runPrismaGenerate(projectRoot) {
-  execSync("npx prisma generate", {
-    cwd: projectRoot,
-    stdio: "inherit",
-  });
-}
-
-function composeProject(projectRoot, options) {
-  const { db } = options;
-  const packageRoot = path.join(__dirname, "..");
-  const assetsDir = path.join(packageRoot, "assets");
-
-  if (db === "postgresql") {
-    setupPostgreSQL(projectRoot, assetsDir);
-  }
-
-  if (db === "mongodb") {
-    setupMongoDB(projectRoot);
-  }
-
-  configureEnvironment(projectRoot, db);
-  cleanPackageJson(projectRoot, db);
 }
 
 module.exports = {
-  composeProject,
-  runPrismaGenerate,
+  DATABASES,
+  PACKAGE_MANAGERS,
+  GenerationError,
+  generateProject,
+  generateSecret,
+  readManifest,
+  resolvePlugins,
+  resolveTarget,
+  validateProjectName,
 };

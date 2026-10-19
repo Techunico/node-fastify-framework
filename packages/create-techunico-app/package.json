@@ -1,9 +1,16 @@
 {
   "name": "@techunico/node-framework",
-  "version": "0.3.4",
+  "version": "0.4.0",
+  "description": "Create a Techunico Fastify application (PostgreSQL/Prisma or MongoDB/Mongoose) with optional plugins",
   "bin": {
     "create-techunico-app": "index.js",
     "techunico": "index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "inquirer": "^8.2.7"
   },
   "publishConfig": {
     "access": "public"
@@ -13,6 +20,7 @@
     "lib",
     "template",
     "overlays",
-    "assets"
+    "assets",
+    "CHANGELOG.md"
   ]
 }

@@ -1,5 +1,5 @@
 import { Schema } from "mongoose";
-import { registerModel } from "@/core/register-model";
+import { registerModel } from "@/plugins/db-mongoose/register-model";
 
 const permissionSchema = new Schema({
   name: { type: String, unique: true, required: true },

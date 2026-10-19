@@ -35,6 +35,7 @@ import {
   PAYMENT_PLUGIN_VERSION,
   PaymentGatewayName,
 } from "../types";
+import { scrubSecrets, toSafeCause } from "@/core/safe-error";
 
 /**
  * Razorpay SDK is imported ONLY in this file.
@@ -522,17 +523,26 @@ export class RazorpayPaymentGatewayAdapter implements PaymentGatewayAdapter {
     if (err instanceof PaymentUnsupportedError) throw err;
     if (err instanceof PaymentNotConfiguredError) throw err;
 
-    const detail =
+    // Razorpay SDK errors look like { statusCode, error: { code, description } }.
+    // Only the provider's error code/description is surfaced; the raw SDK error
+    // (which may include request details) is never attached.
+    const sdkError =
       err && typeof err === "object" && "error" in err
-        ? JSON.stringify((err as { error: unknown }).error)
+        ? ((err as { error: unknown }).error as Record<string, unknown> | undefined)
+        : undefined;
+    const detail =
+      typeof sdkError?.description === "string"
+        ? sdkError.description
         : err instanceof Error
           ? err.message
-          : String(err);
+          : "unexpected gateway response";
+    const cause = toSafeCause(err);
+    if (cause && typeof sdkError?.code === "string") cause.code = sdkError.code;
 
     return new PaymentGatewayError(
-      `${message}: ${detail}`,
+      `${message}: ${scrubSecrets(detail)}`,
       this.name,
-      err,
+      cause,
     );
   }
 }

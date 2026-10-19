@@ -1,25 +1,21 @@
 import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
 import { PrismaClient } from "@/generated/prisma/client";
-import { config } from "@/config";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import path from "path";
+import type { DatabaseAdapter } from "@/core/interfaces/database";
 
-// ✅ Define a minimal adapter interface (can move to core later)
-interface DatabaseAdapter {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  getClient(): unknown;
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Generated Prisma client (PostgreSQL applications only). Same client as `app.db.getClient()`. */
+    prisma: PrismaClient;
+  }
 }
 
-class PrismaAdapter implements DatabaseAdapter {
-  private prisma: PrismaClient;
+export class PrismaAdapter implements DatabaseAdapter<PrismaClient> {
+  readonly provider = "postgresql" as const;
 
-  constructor(prisma: PrismaClient) {
-    this.prisma = prisma;
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   async connect() {
     await this.prisma.$connect();
@@ -29,61 +25,43 @@ class PrismaAdapter implements DatabaseAdapter {
     await this.prisma.$disconnect();
   }
 
+  async ping() {
+    await this.prisma.$queryRaw`SELECT 1`;
+  }
+
   getClient() {
     return this.prisma;
   }
 }
 
-async function dbPlugin(app: FastifyInstance) {
-  let pool: pg.Pool | undefined;
-  let adapterInstance: PrismaPg | PrismaBetterSqlite3;
+export interface PrismaPluginOptions {
+  url?: string;
+}
 
-  // 🔧 Choose adapter
-  switch (config.db.provider) {
-    case "postgresql":
-      pool = new pg.Pool({ connectionString: config.db.url });
-      adapterInstance = new PrismaPg(pool);
-      break;
-
-    case "sqlite":
-      const dbPathRaw = config.db.url.replace("file:", "");
-      const projectRoot = path.resolve(__dirname, "../..");
-      const finalDbPath = path.join(projectRoot, dbPathRaw);
-
-      adapterInstance = new PrismaBetterSqlite3({
-        url: `file:${finalDbPath}`,
-      });
-      break;
-
-    default:
-      throw new Error(`Unsupported db provider: ${config.db.provider}`);
-  }
-
-  // ✅ Create Prisma
-  const prisma = new PrismaClient({ adapter: adapterInstance });
-
-  // ✅ Wrap inside adapter
+async function prismaPlugin(app: FastifyInstance, options: PrismaPluginOptions) {
+  const pool = new pg.Pool({ connectionString: options.url ?? app.config.db.url });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   const db = new PrismaAdapter(prisma);
 
-  await db.connect();
+  try {
+    await db.connect();
+  } catch (error) {
+    await pool.end().catch(() => undefined);
+    throw error;
+  }
 
-  // ✅ Expose GENERIC interface
   app.decorate("db", db);
-
-  // ❌ REMOVE THIS (important)
-  // app.decorate("prisma", prisma);
+  app.decorate("prisma", prisma);
 
   app.addHook("onClose", async () => {
     await db.disconnect();
-    if (pool) await pool.end();
+    await pool.end();
   });
 }
-
 
 export const pluginMeta = {
   type: "db",
   name: "postgresql",
 };
 
-
-export default fp(dbPlugin);
+export default fp(prismaPlugin, { name: "db-prisma" });

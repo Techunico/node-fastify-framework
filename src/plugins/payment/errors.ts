@@ -12,6 +12,17 @@ export enum PaymentErrorCode {
 }
 
 /** Base class for all public payment failures. */
+const STATUS_BY_CODE: Record<PaymentErrorCode, number> = {
+  [PaymentErrorCode.Payment]: 500,
+  [PaymentErrorCode.Gateway]: 502,
+  [PaymentErrorCode.InvalidAmount]: 400,
+  [PaymentErrorCode.InvalidSignature]: 400,
+  [PaymentErrorCode.NotConfigured]: 503,
+  [PaymentErrorCode.Unsupported]: 400,
+  [PaymentErrorCode.UnknownGateway]: 400,
+  [PaymentErrorCode.Timeout]: 504,
+};
+
 export class PaymentError extends Error {
   constructor(
     message: string,
@@ -20,6 +31,11 @@ export class PaymentError extends Error {
   ) {
     super(message);
     this.name = new.target.name;
+  }
+
+  /** HTTP status used by the framework error handler. 4xx messages are shown to clients. */
+  get statusCode(): number {
+    return STATUS_BY_CODE[this.code] ?? 500;
   }
 }
 

@@ -7,3 +7,9 @@ node_modules
 node_modules
 
 /packages/create-techunico-app/template
+# Build output
+dist/
+
+# Local databases and OS files
+*.db
+.DS_Store

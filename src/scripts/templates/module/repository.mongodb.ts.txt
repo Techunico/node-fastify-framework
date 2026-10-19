@@ -1,0 +1,28 @@
+import type { Types } from "mongoose";
+import type { AppDatabase } from "@/plugins/database";
+import { {{pascalName}} } from "./{{name}}.model";
+import type { {{pascalName}}Record, {{pascalName}}RepositoryContract } from "./{{name}}.types";
+
+type {{pascalName}}Document = { _id: Types.ObjectId; name: string; createdAt: Date };
+
+const toRecord = (doc: {{pascalName}}Document): {{pascalName}}Record => ({
+  id: String(doc._id),
+  name: doc.name,
+  createdAt: doc.createdAt,
+});
+
+/** MongoDB (Mongoose). Uses the model registered in {{name}}.model.ts. */
+export class {{pascalName}}Repository implements {{pascalName}}RepositoryContract {
+  // Models use the default mongoose connection opened by the database plugin.
+  constructor(_db: AppDatabase) {}
+
+  async findAll(): Promise<{{pascalName}}Record[]> {
+    const docs = await {{pascalName}}.find().sort({ createdAt: -1 }).lean<{{pascalName}}Document[]>();
+    return docs.map(toRecord);
+  }
+
+  async create(data: { name: string }): Promise<{{pascalName}}Record> {
+    const doc = await {{pascalName}}.create(data);
+    return toRecord(doc);
+  }
+}

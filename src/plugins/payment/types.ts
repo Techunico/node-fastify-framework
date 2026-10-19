@@ -306,6 +306,8 @@ export interface RazorpayGatewayConfig {
 export interface MockGatewayConfig {
   defaultCurrency: PaymentCurrency;
   stableIds: boolean;
+  /** HMAC key for mock signatures. Random per process when omitted. */
+  signingSecret?: string;
 }
 
 export interface PaymentPluginConfig {
@@ -316,6 +318,11 @@ export interface PaymentPluginConfig {
   mock: MockGatewayConfig;
   /** NODE_ENV snapshot for startup validation. */
   nodeEnv: string;
+  /**
+   * Whether the mock gateway may be registered. Always false in production;
+   * the plugin refuses to start if a production config enables it.
+   */
+  allowMock: boolean;
 }
 
 /** Plugin package version reported in health. */

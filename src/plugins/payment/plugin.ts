@@ -19,12 +19,20 @@ export interface PaymentPluginOptions {
   config?: PaymentPluginConfig;
 }
 
-// FastifyInstance.payment is declared optionally in src/types/fastify.d.ts
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Present when PLUGINS includes payment. */
+    payment?: PaymentService;
+  }
+}
 
 /**
  * Build the adapter registry.
- * Always registers Mock for optional routing { provider: "mock" }.
- * Registers Razorpay when credentials exist (or when selected as default after validation).
+ *
+ * Fails closed in production: the mock gateway is never registered and the
+ * selected Razorpay gateway must be fully configured. Outside production, a
+ * default Razorpay gateway without credentials falls back to the mock gateway
+ * with a warning so local development can boot without secrets.
  */
 function buildAdapterRegistry(
   config: PaymentPluginConfig,
@@ -33,65 +41,60 @@ function buildAdapterRegistry(
   adapters: Map<PaymentGatewayName, PaymentGatewayAdapter>;
   defaultProvider: PaymentGatewayName;
 } {
+  for (const warning of assertPaymentConfigForStartup(config)) {
+    log.warn({ provider: PaymentGatewayName.Razorpay }, warning);
+  }
+
+  const production = config.nodeEnv === "production";
+  const mockAllowed = config.allowMock && !production;
   const adapters = new Map<PaymentGatewayName, PaymentGatewayAdapter>();
 
-  // Mock is always available for tests / explicit routing.
-  adapters.set(
-    PaymentGatewayName.Mock,
-    new MockPaymentGatewayAdapter(config.mock),
-  );
-
-  let defaultProvider = config.defaultProvider;
-
-  if (config.defaultProvider === PaymentGatewayName.Razorpay) {
-    assertPaymentConfigForStartup(config);
-
-    if (isRazorpayConfigured(config)) {
-      adapters.set(
-        PaymentGatewayName.Razorpay,
-        new RazorpayPaymentGatewayAdapter(config.razorpay),
-      );
-    } else {
-      // Missing or dummy keys: never crash boot — use mock until real secrets exist.
-      log.warn(
-        {
-          provider: PaymentGatewayName.Razorpay,
-          nodeEnv: config.nodeEnv,
-          hint: "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET for live payments",
-        },
-        "Razorpay credentials missing or dummy — defaulting to mock payment gateway",
-      );
-      defaultProvider = PaymentGatewayName.Mock;
-    }
-  } else if (config.defaultProvider === PaymentGatewayName.Mock) {
-    defaultProvider = PaymentGatewayName.Mock;
-  } else {
-    throw new PaymentError(
-      `Unsupported default payment provider: ${String(config.defaultProvider)}`,
+  if (mockAllowed) {
+    adapters.set(
+      PaymentGatewayName.Mock,
+      new MockPaymentGatewayAdapter(config.mock),
     );
   }
 
-  // If Razorpay is configured but not default, still register for multi-provider routing.
+  if (isRazorpayConfigured(config)) {
+    adapters.set(
+      PaymentGatewayName.Razorpay,
+      new RazorpayPaymentGatewayAdapter(config.razorpay),
+    );
+  }
+
+  let defaultProvider = config.defaultProvider;
+
   if (
-    isRazorpayConfigured(config) &&
-    !adapters.has(PaymentGatewayName.Razorpay)
+    defaultProvider === PaymentGatewayName.Razorpay &&
+    !adapters.has(PaymentGatewayName.Razorpay) &&
+    mockAllowed
   ) {
-    try {
-      adapters.set(
-        PaymentGatewayName.Razorpay,
-        new RazorpayPaymentGatewayAdapter(config.razorpay),
-      );
-    } catch (err) {
-      log.warn(
-        { err: err instanceof Error ? err.message : err },
-        "Optional Razorpay adapter registration skipped",
-      );
-    }
+    log.warn(
+      {
+        provider: PaymentGatewayName.Razorpay,
+        nodeEnv: config.nodeEnv,
+        hint: "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET for real payments",
+      },
+      "Razorpay credentials missing — using the mock payment gateway (non-production only)",
+    );
+    defaultProvider = PaymentGatewayName.Mock;
+  }
+
+  if (
+    defaultProvider !== PaymentGatewayName.Razorpay &&
+    defaultProvider !== PaymentGatewayName.Mock
+  ) {
+    throw new PaymentError(
+      `Unsupported default payment provider: ${String(defaultProvider)}`,
+    );
   }
 
   if (!adapters.has(defaultProvider)) {
     throw new PaymentNotConfiguredError(
-      `Default payment provider "${defaultProvider}" is not registered`,
+      defaultProvider === PaymentGatewayName.Mock
+        ? "The mock payment gateway is not available in this environment"
+        : `Default payment provider "${defaultProvider}" is not configured`,
     );
   }
 
@@ -102,7 +105,7 @@ const registerPayment: FastifyPluginAsync<PaymentPluginOptions> = async (
   app: FastifyInstance,
   options: PaymentPluginOptions,
 ): Promise<void> => {
-  const config = options.config ?? loadPaymentConfig();
+  const config = options.config ?? loadPaymentConfig(app.config.source);
   const { adapters, defaultProvider } = buildAdapterRegistry(config, app.log);
 
   const service = new PaymentService(adapters, defaultProvider, app.log);
@@ -121,6 +124,9 @@ const registerPayment: FastifyPluginAsync<PaymentPluginOptions> = async (
     "Payment plugin registered",
   );
 };
+
+/** Used by the plugin registry to validate PAYMENT_* / RAZORPAY_* only when the plugin is enabled. */
+export const loadConfig = loadPaymentConfig;
 
 /** Register with `await app.register(PaymentPlugin)`. */
 export const PaymentPlugin = fp(registerPayment, { name: "payment" });

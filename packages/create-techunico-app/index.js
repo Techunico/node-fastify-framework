@@ -1,185 +1,208 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
+const { spawnSync } = require("child_process");
 const path = require("path");
-const { execSync } = require("child_process");
-const inquirer = require("inquirer");
-const { composeProject, runPrismaGenerate } = require("./lib/compose");
+const {
+  DATABASES,
+  PACKAGE_MANAGERS,
+  GenerationError,
+  generateProject,
+  readManifest,
+  resolvePlugins,
+  resolveTarget,
+} = require("./lib/compose");
 
-const args = process.argv.slice(2);
+const USAGE = `
+Usage: create-techunico-app <project-name> [options]
 
-if (!args.length || !args[0].trim()) {
-  console.error("❌ Please provide project name");
-  process.exit(1);
+Options:
+  --db <postgresql|mongodb>      Database (default: postgresql with --yes)
+  --plugins <list|none>          Comma-separated optional plugins (e.g. redis,cache)
+  --pm <npm|yarn|pnpm>           Package manager (default: npm with --yes)
+  --skip-install                 Do not install dependencies
+  -y, --yes                      Use defaults instead of prompting
+  -h, --help                     Show this help
+`;
+
+function parseArgs(argv) {
+  const options = { install: true, yes: false };
+  const positional = [];
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    const takeValue = (flag) => {
+      const inline = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : undefined;
+      if (inline !== undefined) return inline;
+      const next = argv[i + 1];
+      if (next === undefined || next.startsWith("-")) {
+        throw new GenerationError(`${flag} requires a value`);
+      }
+      i += 1;
+      return next;
+    };
+
+    if (arg === "-h" || arg === "--help") options.help = true;
+    else if (arg === "-y" || arg === "--yes") options.yes = true;
+    else if (arg === "--skip-install") options.install = false;
+    else if (arg === "--db" || arg.startsWith("--db=")) options.db = takeValue("--db");
+    else if (arg === "--pm" || arg.startsWith("--pm=")) options.pm = takeValue("--pm");
+    else if (arg === "--plugins" || arg.startsWith("--plugins=")) {
+      const value = takeValue("--plugins");
+      options.plugins =
+        value === "none" || value === ""
+          ? []
+          : value.split(",").map((p) => p.trim()).filter(Boolean);
+    } else if (arg.startsWith("-")) throw new GenerationError(`Unknown option: ${arg}`);
+    else positional.push(arg);
+  }
+
+  if (positional.length > 1) {
+    throw new GenerationError(`Unexpected arguments: ${positional.slice(1).join(" ")}`);
+  }
+  options.name = positional[0];
+  return options;
 }
 
-const projectName = args[0];
-const targetPath = path.join(process.cwd(), projectName);
-const templatePath = path.join(__dirname, "template");
+async function promptForMissing(options, manifest) {
+  const needsPrompt = !options.db || !options.plugins || !options.pm;
+  if (!needsPrompt) return options;
 
-if (!fs.existsSync(templatePath)) {
-  console.error("❌ Template missing. Run `npm run build:template` in the framework repo.");
-  process.exit(1);
-}
+  if (options.yes || !process.stdin.isTTY) {
+    return {
+      ...options,
+      db: options.db ?? "postgresql",
+      plugins: options.plugins ?? [],
+      pm: options.pm ?? "npm",
+    };
+  }
 
-if (fs.existsSync(targetPath)) {
-  console.error("❌ Folder already exists");
-  process.exit(1);
-}
-
-async function run() {
+  const inquirer = require("inquirer");
   const answers = await inquirer.prompt([
     {
       type: "list",
       name: "db",
       message: "Select database:",
-      choices: [
-        { name: "PostgreSQL (Prisma)", value: "postgresql" },
-        { name: "MongoDB (Mongoose)", value: "mongodb" },
-      ],
+      when: !options.db,
+      choices: DATABASES.map((value) => ({ name: manifest.databases[value].label, value })),
     },
     {
       type: "checkbox",
       name: "plugins",
       message: "Select optional plugins:",
-      choices: [
-        { name: "Redis", value: "redis" },
-        { name: "Queue (BullMQ)", value: "queue" },
-        { name: "WebSockets (Socket.io)", value: "socket" },
-      ],
+      when: !options.plugins,
+      choices: Object.entries(manifest.plugins).map(([value, entry]) => ({
+        name: `${entry.label} — ${entry.description}${entry.requires.length ? ` (needs ${entry.requires.join(", ")})` : ""}`,
+        value,
+      })),
     },
     {
       type: "list",
-      name: "pkgManager",
+      name: "pm",
       message: "Select package manager:",
-      choices: ["npm", "yarn", "pnpm"],
+      when: !options.pm,
+      choices: PACKAGE_MANAGERS,
     },
   ]);
 
-  const { db, pkgManager, plugins } = answers;
-
-  fs.mkdirSync(targetPath, { recursive: true });
-  fs.cpSync(templatePath, targetPath, { recursive: true, force: true });
-
-  const pkgPath = path.join(targetPath, "package.json");
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-
-  pkg.name = projectName;
-
-  pkg.dependencies = {
-    fastify: "^5.8.5",
-    "fastify-plugin": "^5.1.0",
-    dotenv: "^17.4.2",
-    pino: "^10.3.1",
-    "pino-pretty": "^13.1.3",
-    zod: "^4.3.6",
-    jsonwebtoken: "^9.0.3",
-    "prom-client": "^15.1.3",
-    "tsconfig-paths": "^4.2.0",
-    bcrypt: "^6.0.0",
-  };
-
-  pkg.devDependencies = {
-    typescript: "^6.0.2",
-    "ts-node-dev": "^2.0.0",
-    "@types/node": "^25.6.0",
-    "@types/bcrypt": "^6.0.0",
-  };
-
-  if (db === "postgresql") {
-    Object.assign(pkg.dependencies, {
-      "@prisma/client": "^7.7.0",
-      "@prisma/adapter-pg": "^7.7.0",
-      pg: "^8.20.0",
-    });
-
-    Object.assign(pkg.devDependencies, {
-      prisma: "^7.7.0",
-      "ts-node": "^10.9.2",
-      "@types/pg": "^8.20.0",
-    });
-
-    pkg.scripts.generate = "prisma generate";
-    pkg.scripts.migrate = "prisma migrate dev";
-    pkg.scripts.seed = "ts-node prisma/seed.ts";
-    pkg.prisma = {
-      seed: "ts-node prisma/seed.ts",
-    };
-  }
-
-  if (db === "mongodb") {
-    pkg.dependencies.mongoose = "^8.5.0";
-    pkg.devDependencies["ts-node"] = "^10.9.2";
-    pkg.scripts.seed = "ts-node scripts/seed.ts";
-  }
-
-  if (plugins.includes("redis")) {
-    pkg.dependencies.ioredis = "^5.10.1";
-  }
-
-  if (plugins.includes("queue")) {
-    pkg.dependencies.bullmq = "^5.74.1";
-  }
-
-  if (plugins.includes("socket")) {
-    pkg.dependencies["socket.io"] = "^4.8.3";
-  }
-
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-
-  composeProject(targetPath, { db, plugins });
-
-  const envPath = path.join(targetPath, ".env");
-  let envContent = fs.readFileSync(envPath, "utf-8");
-
-  if (plugins.length > 0) {
-    envContent = envContent.replace(/^PLUGINS=.*$/m, `PLUGINS=${plugins.join(",")}`);
-  } else {
-    envContent = envContent.replace(/^PLUGINS=.*$/m, "PLUGINS=");
-  }
-
-  fs.writeFileSync(envPath, envContent);
-
-  console.log(`\n✅ Project ${projectName} created`);
-
-  console.log(`\n📦 Installing dependencies using ${pkgManager}...\n`);
-
-  const installCmd =
-    pkgManager === "npm"
-      ? "npm install"
-      : pkgManager === "yarn"
-      ? "yarn"
-      : "pnpm install";
-
-  execSync(installCmd, {
-    cwd: targetPath,
-    stdio: "inherit",
-  });
-
-  if (db === "postgresql") {
-    console.log("\n🔧 Generating Prisma client...\n");
-    runPrismaGenerate(targetPath);
-  }
-
-  const devCmd =
-    pkgManager === "npm" ? "npm run dev" : `${pkgManager} dev`;
-
-  console.log(`
-🚀 Next steps:
-
-cd ${projectName}
-`);
-
-  if (db === "postgresql") {
-    console.log(`${pkgManager === "npm" ? "npm run migrate" : pkgManager + " migrate"}   # after database is running`);
-    console.log(`${pkgManager === "npm" ? "npm run seed" : pkgManager + " seed"}       # optional`);
-  }
-
-  if (db === "mongodb") {
-    console.log(`${pkgManager === "npm" ? "npm run seed" : pkgManager + " seed"}       # after MongoDB is running`);
-  }
-
-  console.log(devCmd);
+  return { ...options, ...answers };
 }
 
-run();
+function run(command, args, cwd) {
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+  if (result.error) return { ok: false, reason: result.error.message };
+  if (result.status !== 0) return { ok: false, reason: `exit code ${result.status}` };
+  return { ok: true };
+}
+
+function scriptCommand(pm, script) {
+  return pm === "npm" ? `npm run ${script}` : `${pm} ${script}`;
+}
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+
+  if (options.help) {
+    console.log(USAGE);
+    return 0;
+  }
+
+  const target = resolveTarget(process.cwd(), options.name);
+  const manifest = readManifest();
+  const answers = await promptForMissing(options, manifest);
+
+  if (!PACKAGE_MANAGERS.includes(answers.pm)) {
+    throw new GenerationError(`Unsupported package manager "${answers.pm}"`);
+  }
+
+  const plugins = resolvePlugins(manifest, answers.plugins);
+  const added = plugins.filter((name) => !answers.plugins.includes(name));
+  if (added.length) {
+    console.log(`ℹ️  Also enabling required plugin(s): ${added.join(", ")}`);
+  }
+
+  const result = generateProject({
+    target,
+    name: options.name,
+    db: answers.db,
+    plugins,
+  });
+
+  console.log(`\n✅ Project ${options.name} created (${answers.db}; plugins: ${plugins.join(", ") || "none"})`);
+  console.log("🔐 Generated unique JWT secrets in .env (not printed). Keep .env out of version control.");
+
+  const relative = path.relative(process.cwd(), result.target) || ".";
+
+  if (!answers.install) {
+    console.log(`\nNext steps:\n\n  cd ${relative}\n  ${answers.pm} install`);
+    if (answers.db === "postgresql") console.log(`  ${scriptCommand(answers.pm, "generate")}`);
+    console.log(`  ${scriptCommand(answers.pm, "dev")}`);
+    return 0;
+  }
+
+  console.log(`\n📦 Installing dependencies using ${answers.pm}...\n`);
+  const install = run(answers.pm, ["install"], result.target);
+  if (!install.ok) {
+    console.error(
+      `\n❌ Dependency installation failed (${install.reason}). The project was kept at ${relative}.\n` +
+        `   Fix the problem, then run \`${answers.pm} install\` inside it.`,
+    );
+    return 1;
+  }
+
+  if (answers.db === "postgresql") {
+    console.log("\n🔧 Generating Prisma client...\n");
+    const generate = run(answers.pm === "npm" ? "npx" : answers.pm, ["prisma", "generate"], result.target);
+    if (!generate.ok) {
+      console.error(
+        `\n❌ Prisma client generation failed (${generate.reason}). Run \`${scriptCommand(answers.pm, "generate")}\` inside ${relative}.`,
+      );
+      return 1;
+    }
+  }
+
+  console.log(`\n🚀 Next steps:\n\n  cd ${relative}`);
+  if (answers.db === "postgresql") {
+    console.log(`  ${scriptCommand(answers.pm, "migrate")}   # after PostgreSQL is running`);
+  }
+  console.log(`  ${scriptCommand(answers.pm, "seed")}      # optional, after the database is running`);
+  console.log(`  ${scriptCommand(answers.pm, "dev")}`);
+  return 0;
+}
+
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error) => {
+    if (error instanceof GenerationError) {
+      console.error(`❌ ${error.message}`);
+      if (/project name/i.test(error.message)) console.error(USAGE);
+    } else {
+      console.error("❌ Unexpected error:", error instanceof Error ? error.message : error);
+    }
+    process.exitCode = 1;
+  });

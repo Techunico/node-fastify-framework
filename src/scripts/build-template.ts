@@ -1,211 +1,79 @@
+/**
+ * Builds packages/create-techunico-app/template from the framework source.
+ *
+ *   src/ (minus tooling, experimental code, generated client)  → template/src
+ *   tsconfig*.json, jest.config.js, .env.example                → template/
+ *   packages/create-techunico-app/scaffold/*                    → template/  (app-owned files)
+ *   prisma/{schema.postgresql.prisma,seed.ts,starter/…}         → assets/prisma
+ *
+ * Paths are resolved from this file, so the script works from any cwd.
+ */
 import fs from "fs";
 import path from "path";
 
-const root = process.cwd();
+const repoRoot = path.resolve(__dirname, "..", "..");
+const cliRoot = path.join(repoRoot, "packages/create-techunico-app");
+const templateRoot = path.join(cliRoot, "template");
+const scaffoldRoot = path.join(cliRoot, "scaffold");
+const assetsPrisma = path.join(cliRoot, "assets/prisma");
 
-const templateRoot = path.join(root, "template");
-const cliTemplate = path.join(root, "packages/create-techunico-app/template");
-const cliAssetsPrisma = path.join(
-  root,
-  "packages/create-techunico-app/assets/prisma",
-);
-
-const resolve = (...p: string[]) => path.join(root, ...p);
-
-fs.rmSync(templateRoot, { recursive: true, force: true });
-fs.rmSync(cliTemplate, { recursive: true, force: true });
-
-fs.mkdirSync(templateRoot, { recursive: true });
-
-const copy = (src: string, dest: string) => {
-  const srcPath = resolve(src);
-  if (!fs.existsSync(srcPath)) return;
-  fs.cpSync(srcPath, dest, { recursive: true });
-};
-
-copy("src", path.join(templateRoot, "src"));
-
-const excludedTemplatePaths = [
-  path.join(templateRoot, "src/scripts/build-template.ts"),
-  path.join(templateRoot, "src/scripts/add-plugin.ts"),
+/** Paths under src/ that never ship to applications. */
+export const EXCLUDED_SOURCE_PATHS = [
+  "scripts/build-template.ts",
+  "experimental",
+  "generated",
 ];
 
-for (const excludedPath of excludedTemplatePaths) {
-  if (fs.existsSync(excludedPath)) {
-    fs.rmSync(excludedPath, { force: true });
+const EXCLUDED_FILE_NAMES = new Set([".DS_Store", "Thumbs.db"]);
+
+const fromRepo = (...segments: string[]) => path.join(repoRoot, ...segments);
+
+function copySource() {
+  const sourceRoot = fromRepo("src");
+  const excluded = EXCLUDED_SOURCE_PATHS.map((p) => path.join(sourceRoot, p));
+
+  fs.cpSync(sourceRoot, path.join(templateRoot, "src"), {
+    recursive: true,
+    filter: (source) =>
+      !EXCLUDED_FILE_NAMES.has(path.basename(source)) &&
+      !excluded.some((p) => source === p || source.startsWith(p + path.sep)),
+  });
+}
+
+function copyFile(source: string, destination: string) {
+  if (!fs.existsSync(source)) {
+    throw new Error(`build-template: missing ${path.relative(repoRoot, source)}`);
   }
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.copyFileSync(source, destination);
 }
-copy("tsconfig.json", path.join(templateRoot, "tsconfig.json"));
-copy(".env.example", path.join(templateRoot, ".env.example"));
-copy(".gitignore", path.join(templateRoot, ".gitignore"));
-
-const prismaGeneratedPath = path.join(templateRoot, "src/generated");
-
-if (fs.existsSync(prismaGeneratedPath)) {
-  fs.rmSync(prismaGeneratedPath, { recursive: true, force: true });
-}
-
-const rootPkg = JSON.parse(fs.readFileSync(resolve("package.json"), "utf-8"));
-
-const baseScripts = [
-  "dev",
-  "build",
-  "start",
-  "test",
-  "make:module",
-  "plugin:add",
-];
-
-const filteredScripts: Record<string, string> = {};
-
-for (const key of baseScripts) {
-  if (rootPkg.scripts?.[key]) {
-    filteredScripts[key] = rootPkg.scripts[key];
-  }
-}
-
-const templatePkg = {
-  name: "my-app",
-  version: "1.0.0",
-  private: true,
-  scripts: filteredScripts,
-  dependencies: {},
-  devDependencies: {},
-};
-
-fs.writeFileSync(
-  path.join(templateRoot, "package.json"),
-  JSON.stringify(templatePkg, null, 2),
-);
-
-const templateReadme = `
-# 🚀 Techunico App
-
-This project was generated using:
-
-npx @techunico/node-framework
-
----
-
-# ⚡ Quick Start
-
-## 1. Setup environment
-
-\`\`\`bash
-cp .env.example .env
-\`\`\`
-
----
-
-## 2. Install dependencies
-
-\`\`\`bash
-npm install
-\`\`\`
-
----
-
-## 3. Run the app
-
-\`\`\`bash
-npm run dev
-\`\`\`
-
----
-
-# 📡 API
-
-Base URL:
-
-\`\`\`
-/api/v1
-\`\`\`
-
----
-
-# ❤️ Health & Metrics
-
-\`\`\`
-GET /health
-GET /ready
-GET /metrics
-\`\`\`
-
----
-
-# 🧱 Structure
-
-\`\`\`
-src/
-├── modules/
-├── plugins/
-├── core/
-├── config/
-\`\`\`
-
----
-
-# 🔐 Auth
-
-\`\`\`
-POST /api/v1/auth/register
-POST /api/v1/auth/login
-\`\`\`
-
----
-
-# 🧠 Notes
-
-Database support:
-- PostgreSQL (Prisma plugin)
-- MongoDB (Mongoose plugin)
-
-- Uses Zod for validation
-- Includes RBAC system
-
----
-
-# 👨‍💻 Techunico
-
-Built with ❤️ by Techunico
-`;
-
-fs.writeFileSync(path.join(templateRoot, "README.md"), templateReadme.trim());
-
-fs.mkdirSync(cliTemplate, { recursive: true });
-fs.cpSync(templateRoot, cliTemplate, { recursive: true });
 
 function syncPrismaAssets() {
-  const schemaSource = resolve("prisma/schema.postgresql.prisma");
-  const seedSource = resolve("prisma/seed.ts");
-  const configSource = resolve("prisma/starter/prisma.config.ts");
+  fs.rmSync(assetsPrisma, { recursive: true, force: true });
+  fs.mkdirSync(assetsPrisma, { recursive: true });
 
-  if (!fs.existsSync(schemaSource)) {
-    return;
-  }
-
-  fs.rmSync(cliAssetsPrisma, { recursive: true, force: true });
-  fs.mkdirSync(cliAssetsPrisma, { recursive: true });
-
-  fs.copyFileSync(
-    schemaSource,
-    path.join(cliAssetsPrisma, "schema.postgresql.prisma"),
-  );
-
-  if (fs.existsSync(seedSource)) {
-    fs.copyFileSync(seedSource, path.join(cliAssetsPrisma, "seed.ts"));
-  }
-
-  if (fs.existsSync(configSource)) {
-    fs.copyFileSync(
-      configSource,
-      path.join(cliAssetsPrisma, "prisma.config.ts.template"),
-    );
-  }
+  copyFile(fromRepo("prisma/schema.postgresql.prisma"), path.join(assetsPrisma, "schema.postgresql.prisma"));
+  copyFile(fromRepo("prisma/seed.ts"), path.join(assetsPrisma, "seed.ts"));
+  copyFile(fromRepo("prisma/starter/prisma.config.ts"), path.join(assetsPrisma, "prisma.config.ts.template"));
 }
 
-syncPrismaAssets();
+function main() {
+  fs.rmSync(templateRoot, { recursive: true, force: true });
+  fs.mkdirSync(templateRoot, { recursive: true });
 
-fs.rmSync(templateRoot, { recursive: true, force: true });
+  copySource();
+  for (const file of ["tsconfig.json", "tsconfig.build.json", "tsconfig.test.json", "jest.config.js"]) {
+    copyFile(fromRepo(file), path.join(templateRoot, file));
+  }
+  copyFile(fromRepo(".env.example"), path.join(templateRoot, ".env.example"));
 
-console.log("✅ Template built & synced to CLI");
+  for (const entry of fs.readdirSync(scaffoldRoot)) {
+    fs.cpSync(path.join(scaffoldRoot, entry), path.join(templateRoot, entry), { recursive: true });
+  }
+
+  syncPrismaAssets();
+
+  console.log(`✅ Template built: ${path.relative(repoRoot, templateRoot)}`);
+}
+
+main();

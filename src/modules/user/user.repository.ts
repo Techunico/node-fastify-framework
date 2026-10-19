@@ -1,62 +1,60 @@
-import { PrismaClient } from "@/generated/prisma/client";
-import { BaseRepository } from "@/core/base.repository";
+import type { AppDatabase } from "@/plugins/database";
+import type {
+  AuthUserRecord,
+  CreateUserInput,
+  UserRecord,
+  UserRepositoryContract,
+} from "./user.types";
 
-export class UserRepository extends BaseRepository<any> {
-  private prisma: PrismaClient;
+const publicFields = { id: true, name: true, email: true, createdAt: true } as const;
 
-  constructor(prisma: PrismaClient) {
-    super(prisma.user);
-    this.prisma = prisma;
+/** PostgreSQL (Prisma) implementation of the user repository contract. */
+export class UserRepository implements UserRepositoryContract {
+  private readonly prisma: ReturnType<AppDatabase["getClient"]>;
+
+  constructor(db: AppDatabase) {
+    this.prisma = db.getClient();
   }
 
-  // ✅ Override base method (custom select)
-  async findAll() {
-    return this.model.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-      },
-    });
+  async findAll(): Promise<UserRecord[]> {
+    const users = await this.prisma.user.findMany({ select: publicFields });
+    return users.map((user) => ({ ...user, id: String(user.id) }));
   }
 
-  async findByEmail(email: string) {
-    return this.model.findUnique({
+  async findByEmail(email: string): Promise<UserRecord | null> {
+    const user = await this.prisma.user.findUnique({ where: { email }, select: publicFields });
+    return user ? { ...user, id: String(user.id) } : null;
+  }
+
+  async findAuthUserByEmail(email: string): Promise<AuthUserRecord | null> {
+    const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { role: { include: { permissions: { select: { name: true } } } } },
     });
+    if (!user) return null;
+
+    return {
+      id: String(user.id),
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      createdAt: user.createdAt,
+      role: user.role
+        ? { name: user.role.name, permissions: user.role.permissions.map((p) => p.name) }
+        : null,
+    };
   }
 
-  async findAuthUserByEmail(email: string) {
-    return this.model.findUnique({
-      where: { email },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
+  async create(data: CreateUserInput): Promise<UserRecord> {
+    const user = await this.prisma.user.create({
+      data: { name: data.name, email: data.email, password: data.password, roleId: Number(data.roleId) },
+      select: publicFields,
     });
+    return { ...user, id: String(user.id) };
   }
 
-  async create(data: {
-    name: string;
-    email: string;
-    password: string;
-    roleId: number;
-  }) {
-    return this.model.create({ data });
-  }
-
-  // ⚠️ Cross-model access → use prisma directly
   async findRoleByName(name: string) {
-    return this.prisma.role.findUnique({
-      where: { name },
-    });
+    const role = await this.prisma.role.findUnique({ where: { name } });
+    return role ? { id: String(role.id), name: role.name } : null;
   }
 }

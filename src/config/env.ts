@@ -1,27 +1,23 @@
 import { envSchema, EnvConfig } from './env.schema'
 
-function loadEnv(): EnvConfig {
-  const rawEnv = { ...process.env }
-
-  if ((rawEnv.NODE_ENV ?? 'development') === 'test') {
-    rawEnv.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/nodejs_framework_test'
-    rawEnv.DB_PROVIDER
-    rawEnv.JWT_SECRET ??= 'test-secret-12345'
-    rawEnv.REDIS_HOST,
-    rawEnv.REDIS_PORT
-    rawEnv.REDIS_PASSWORD
-    rawEnv.PLUGINS ??= 'redis,events'
+export class ConfigError extends Error {
+  constructor(public readonly issues: string[]) {
+    super(`Invalid environment variables:\n  - ${issues.join('\n  - ')}`)
+    this.name = 'ConfigError'
   }
+}
 
-  const parsed = envSchema.safeParse(rawEnv)
+/** Validates an environment record. Never prints values, only variable names and reasons. */
+export function parseEnv(source: NodeJS.ProcessEnv): EnvConfig {
+  const parsed = envSchema.safeParse(source)
 
   if (!parsed.success) {
-    console.error('❌ Invalid environment variables')
-    console.error(parsed.error.format())
-    throw new Error('Invalid environment variables')
+    const issues = parsed.error.issues.map((issue) => {
+      const key = issue.path.join('.') || '(root)'
+      return `${key}: ${issue.message}`
+    })
+    throw new ConfigError(issues)
   }
 
   return parsed.data
 }
-
-export const env = loadEnv()

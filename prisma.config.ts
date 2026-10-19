@@ -1,22 +1,13 @@
 import "dotenv/config";
-import path from "path";
 import { defineConfig } from "prisma/config";
 
-const provider = process.env.DB_PROVIDER ?? "postgresql";
-
-const schemaMap: Record<string, string> = {
-  postgresql: "prisma/schema.postgresql.prisma",
-  sqlite:     "prisma/schema.sqlite.prisma",
-};
-
-if (!schemaMap[provider]) {
-  throw new Error(`Unsupported DB_PROVIDER: "${provider}"`);
-}
-
+// Framework development database (PostgreSQL only). Generated applications
+// get their own prisma.config.ts from packages/create-techunico-app/assets.
 export default defineConfig({
-  schema: schemaMap[provider],
+  schema: "prisma/schema.postgresql.prisma",
   migrations: {
-    path: `prisma/migrations_${provider}`,   // 👈 separate history per provider
+    path: "prisma/migrations",
+    seed: "ts-node prisma/seed.ts",
   },
   datasource: {
     url: process.env.DATABASE_URL,

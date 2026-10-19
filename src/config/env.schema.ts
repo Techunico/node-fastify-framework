@@ -1,62 +1,112 @@
 import { z } from "zod";
 
-export const envSchema = z.object({
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
+/** Treat empty strings (e.g. `KEY=` in .env) as "not set". */
+const blankToUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
 
-  PORT: z.coerce.number().default(3000),
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(blankToUndefined, schema.optional());
 
-  DATABASE_URL: z.string().min(1),
-  DB_PROVIDER: z.string().min(1),
+/**
+ * Values that have shipped in templates or are commonly copy-pasted. A secret
+ * matching any of these is rejected regardless of length.
+ */
+const KNOWN_PLACEHOLDER_SECRETS = [
+  "supersecuresecret",
+  "secret",
+  "secret_admin",
+  "secret_user",
+  "changeme",
+  "change-me",
+  "your-secret",
+  "your_secret",
+  "jwt_secret",
+  "test-secret-12345",
+];
 
-  JWT_SECRET: z.string().min(10),
+export const MIN_SECRET_LENGTH = 32;
 
-  LOG_LEVEL: z.enum(["info", "warn", "error", "debug"]).default("info"),
+export function isWeakSecret(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length < MIN_SECRET_LENGTH) return true;
+  if (KNOWN_PLACEHOLDER_SECRETS.some((placeholder) => normalized.includes(placeholder))) {
+    return true;
+  }
+  // Low-entropy values such as "aaaa…" or "abababab…".
+  return new Set(normalized).size < 8;
+}
+
+const booleanString = (fallback: "true" | "false") =>
+  z
+    .preprocess(blankToUndefined, z.enum(["true", "false"]).default(fallback))
+    .transform((value) => value === "true");
+
+export const secret = (name: string) =>
+  z
+    .string({ error: `${name} is required` })
+    .refine((value) => !isWeakSecret(value), {
+      message: `${name} must be a random value of at least ${MIN_SECRET_LENGTH} characters (placeholders are rejected). Generate one with: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`,
+    });
+
+/**
+ * Core settings only. Optional plugins (redis, geo, cloudinary, payment, …)
+ * validate their own variables when — and only when — they are enabled.
+ */
+const baseSchema = z.object({
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  PORT: z.coerce.number().int().positive().default(3000),
+  HOST: z.string().default("0.0.0.0"),
+
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
   API_PREFIX: z.string().default("/api"),
   API_VERSION: z.string().default("v1"),
-  REDIS_HOST: z.string(),
-  REDIS_PORT: z.coerce.number(),
-  REDIS_PASSWORD: z.string().optional(),
   PLUGINS: z.string().default(""),
 
-  // ─── MongoDB (used when DB_PROVIDER=mongodb) ─────────────────────────────
-  MONGO_URI: z.string().optional(),
+  // ─── Authentication ──────────────────────────────────────────────────────
+  JWT_SECRET: secret("JWT_SECRET"),
+  JWT_ADMIN_SECRET: optional(secret("JWT_ADMIN_SECRET")),
+  JWT_ISSUER: z.string().min(1).default("techunico"),
+  JWT_AUDIENCE: z.string().min(1).default("techunico-api"),
+  JWT_ACCESS_TTL: z.string().min(1).default("15m"),
+  JWT_REFRESH_TTL: z.string().min(1).default("30d"),
 
-  // ─── Geo plugin (optional — enable with PLUGINS=geo) ─────────────────────
-  GEO_PROVIDER: z.enum(["google", "tomtom"]).optional(),
-  GEO_FALLBACK_PROVIDER: z.enum(["google", "tomtom"]).optional(),
-  GOOGLE_MAPS_API_KEY: z.string().default(""),
-  GOOGLE_MAPS_BASE_URL: z.string().default(""),
-  GOOGLE_ROUTES_BASE_URL: z.string().default(""),
-  GOOGLE_PLACES_BASE_URL: z.string().default(""),
-  GOOGLE_ROADS_BASE_URL: z.string().default(""),
-  TOMTOM_API_KEY: z.string().default(""),
-  TOMTOM_BASE_URL: z.string().default(""),
-  GEO_REQUEST_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(5000),
-  GEO_REQUEST_RETRIES: z.coerce.number().int().nonnegative().default(2),
-  GEO_RETRY_DELAY_MS: z.coerce.number().int().nonnegative().default(200),
+  // ─── HTTP hardening ──────────────────────────────────────────────────────
+  /** false | true | <hop count> | comma-separated proxy IPs/CIDRs */
+  TRUST_PROXY: z.string().default("false"),
+  /** Comma-separated allowed origins. Unset: no CORS in production, any origin in development. */
+  CORS_ORIGINS: optional(z.string()),
+  CORS_CREDENTIALS: booleanString("false"),
+  RATE_LIMIT_ENABLED: booleanString("true"),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_WINDOW: z.string().min(1).default("1 minute"),
+  /** Stricter limit for /auth/login and /auth/register (per client IP). */
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  AUTH_RATE_LIMIT_WINDOW: z.string().min(1).default("1 minute"),
 
-  // ─── Cloudinary plugin (optional — enable with PLUGINS=cloudinary) ───────
-  CLOUDINARY_CLOUD_NAME: z.string().default(""),
-  CLOUDINARY_API_KEY: z.string().default(""),
-  CLOUDINARY_API_SECRET: z.string().default(""),
-  CLOUDINARY_DEFAULT_FOLDER: z.string().default("general"),
-  CLOUDINARY_SECURE: z
-    .enum(["true", "false"])
-    .default("true")
-    .transform((v) => v === "true"),
+  // ─── Metrics ─────────────────────────────────────────────────────────────
+  METRICS_ENABLED: booleanString("true"),
+  /** Bearer token required to read /metrics. Required in production unless METRICS_PUBLIC=true. */
+  METRICS_TOKEN: optional(z.string().min(16, "METRICS_TOKEN must be at least 16 characters")),
+  METRICS_PUBLIC: booleanString("false"),
 
-  // ─── Payment plugin (optional — enable with PLUGINS=payment) ─────────────
-  PAYMENT_PROVIDER: z.enum(["razorpay", "mock"]).default("razorpay"),
-  RAZORPAY_KEY_ID: z.string().default("rzp_test_dummy_key_id"),
-  RAZORPAY_KEY_SECRET: z.string().default("dummy_razorpay_secret_not_for_live"),
-  RAZORPAY_WEBHOOK_SECRET: z.string().default(""),
-  PAYMENT_CURRENCY: z.string().default("INR"),
-  PAYMENT_MOCK_STABLE_IDS: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((v) => v === "true"),
+  // ─── Lifecycle ───────────────────────────────────────────────────────────
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 });
 
+const databaseSchema = z.discriminatedUnion("DB_PROVIDER", [
+  z.object({
+    DB_PROVIDER: z.literal("postgresql"),
+    DATABASE_URL: z.string().min(1, "DATABASE_URL is required when DB_PROVIDER=postgresql"),
+  }),
+  z.object({
+    DB_PROVIDER: z.literal("mongodb"),
+    MONGO_URI: z.string().min(1, "MONGO_URI is required when DB_PROVIDER=mongodb"),
+  }),
+]);
+
+export const envSchema = z.intersection(baseSchema, databaseSchema);
+
 export type EnvConfig = z.infer<typeof envSchema>;
+export type DbProvider = EnvConfig["DB_PROVIDER"];

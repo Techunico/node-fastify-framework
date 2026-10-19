@@ -1,32 +1,9 @@
-import { FastifyRequest, FastifyReply } from 'fastify'
-import { UserService } from './user.service'
+import { FastifyRequest, FastifyReply } from "fastify";
 
 export class UserController {
   async getUsers(request: FastifyRequest, reply: FastifyReply) {
-    const service = new UserService(request.server.prisma)
+    const users = await request.services.users.getAllUsers();
 
-    const users = await service.getAllUsers()
-
-    return reply.send({
-      success: true,
-      data: users,
-    })
+    return reply.success(users);
   }
-
-  // async createUser(request: FastifyRequest, reply: FastifyReply) {
-  //   const service = new UserService(request.server.prisma)
-
-  //   const data = request.body as {
-  //     name: string
-  //     email: string
-  //     password:string
-  //   }
-
-  //   const user = await service.createUser(data)
-
-  //   return reply.send({
-  //     success: true,
-  //     data: user,
-  //   })
-  // }
 }

@@ -1,8 +1,14 @@
-import { FastifyInstance } from 'fastify'
-import { {{name}}Controller } from './{{name}}.controller'
+import { FastifyInstance } from "fastify";
+import { validateBody } from "@/core/validation.middleware";
+import { {{pascalName}}Controller } from "./{{name}}.controller";
+import { {{pascalName}}Repository } from "./{{name}}.repository";
+import { create{{pascalName}}Schema } from "./{{name}}.schema";
+import { {{pascalName}}Service } from "./{{name}}.service";
 
-export async function {{name}}Routes(app: FastifyInstance) {
-  const controller = new {{name}}Controller()
+export async function {{camelName}}Routes(app: FastifyInstance) {
+  const service = new {{pascalName}}Service(new {{pascalName}}Repository(app.db));
+  const controller = new {{pascalName}}Controller(service);
 
-  app.get('/', controller.findAll.bind(controller))
+  app.get("/", controller.findAll.bind(controller));
+  app.post("/", { preHandler: [validateBody(create{{pascalName}}Schema)] }, controller.create.bind(controller));
 }

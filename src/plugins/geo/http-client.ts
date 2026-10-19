@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, GenericAbortSignal } from "axios";
 import { ProviderError, ProviderTimeoutError } from "./errors";
 import { GeoProviderName, ProviderHttpConfig } from "./types";
+import { toSafeCause } from "@/core/safe-error";
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
@@ -41,11 +42,11 @@ export class GeoHttpClient {
           await delay(this.config.retryDelayMs * 2 ** attempt, request.signal);
           continue;
         }
-        if (timedOut) throw new ProviderTimeoutError(this.provider, this.config.timeoutMs, error);
+        if (timedOut) throw new ProviderTimeoutError(this.provider, this.config.timeoutMs, toSafeCause(error));
         throw new ProviderError(
           `${this.provider} request failed${axiosError?.response ? ` with status ${axiosError.response.status}` : ""}`,
           this.provider,
-          error,
+          toSafeCause(error),
         );
       }
     }

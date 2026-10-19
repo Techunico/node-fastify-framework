@@ -10,6 +10,15 @@ export enum GeoErrorCode {
 }
 
 /** Base class for all public geo failures. */
+const STATUS_BY_CODE: Record<GeoErrorCode, number> = {
+  [GeoErrorCode.Geo]: 500,
+  [GeoErrorCode.Provider]: 502,
+  [GeoErrorCode.InvalidCoordinates]: 400,
+  [GeoErrorCode.RouteNotFound]: 404,
+  [GeoErrorCode.GeocodeFailed]: 422,
+  [GeoErrorCode.ProviderTimeout]: 504,
+};
+
 export class GeoError extends Error {
   constructor(
     message: string,
@@ -18,6 +27,11 @@ export class GeoError extends Error {
   ) {
     super(message);
     this.name = new.target.name;
+  }
+
+  /** HTTP status used by the framework error handler. 4xx messages are shown to clients. */
+  get statusCode(): number {
+    return STATUS_BY_CODE[this.code] ?? 500;
   }
 }
 
